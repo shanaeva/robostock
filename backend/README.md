@@ -2,7 +2,9 @@
 
 ## Как запустить проект
 
-Нужны Node.js LTS, npm и запущенный Docker. Первый запуск из корня (Linux/WSL):
+Нужны Node.js 24.21+ (ветка 24 LTS), pnpm 12.18.0 и запущенный Docker.
+Установить pnpm: `npm install --global pnpm@12.18.0`.
+Первый запуск из корня (Linux/WSL):
 
 ```bash
 cp -n .env.example .env
@@ -10,16 +12,16 @@ cp -n backend/.env.example backend/.env
 # Сверь порт и доступы БД в обоих .env перед запуском.
 docker compose up -d --wait
 cd backend
-npm ci
-npm run db:deploy
-npm run start:dev
+pnpm install --frozen-lockfile
+pnpm run db:deploy
+pnpm run start:dev
 ```
 
 ## Тестирование
 
-**Unit-тесты** проверяют логику сервисов изолированно: обращения к БД заменены заглушками. Отдельно проверяют Zod-схемы. Запуск из `backend/`: `npm test`.
+**Unit-тесты** проверяют логику сервисов изолированно: обращения к БД заменены заглушками. Отдельно проверяют Zod-схемы. Запуск из `backend/`: `pnpm test`.
 
-**E2E-тесты** проверяют контроллеры и сервисы вместе через HTTP: валидацию запросов, работу с реальной БД, ответы и ошибки API. Запуск: `npm run test:e2e`.
+**E2E-тесты** проверяют контроллеры и сервисы вместе через HTTP: валидацию запросов, работу с реальной БД, ответы и ошибки API. Запуск: `pnpm run test:e2e`.
 
 ```text
 Unit: Сервис → Заглушка Prisma
