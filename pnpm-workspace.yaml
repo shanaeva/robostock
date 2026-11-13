@@ -1,3 +1,16 @@
 packages:
   - frontend
   - backend
+
+engineStrict: true
+saveExact: true
+strictPeerDependencies: true
+enablePrePostScripts: true
+
+allowBuilds:
+  '@prisma/engines': true
+  '@scarf/scarf': false
+  fsevents: true
+  prisma: true
+  sharp: false
+  unrs-resolver: false
