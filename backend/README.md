@@ -7,14 +7,17 @@
 Первый запуск из корня (Linux/WSL):
 
 ```bash
+# Из корня robostock
+pnpm install --frozen-lockfile
+
+# Подготовка окружения и запуск БД
 cp -n .env.example .env
 cp -n backend/.env.example backend/.env
-# Сверь порт и доступы БД в обоих .env перед запуском.
 docker compose up -d --wait
-cd backend
-pnpm install --frozen-lockfile
-pnpm run db:deploy
-pnpm run start:dev
+
+# Миграции и запуск бэкенда
+pnpm --filter backend db:deploy
+pnpm --filter backend start:dev
 ```
 
 ## Тестирование

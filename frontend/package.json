@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "fsd:check": "steiger ./src"
   },
   "dependencies": {
     "next": "16.4.6",
@@ -14,12 +15,15 @@
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@feature-sliced/steiger-plugin": "^0.8.2",
+    "@stylistic/eslint-plugin": "5.10.0",
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
+    "steiger": "^0.10.0",
     "tailwindcss": "4.3.3",
     "typescript": "^5"
   },
