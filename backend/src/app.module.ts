@@ -5,6 +5,7 @@ import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { HttpExceptionFilter } from './common/http-exception.filter.js';
 import { environmentSchema } from './config/environment.js';
 import { HealthController } from './health.controller.js';
+import { AuthModule } from './modules/auth/auth.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
@@ -16,6 +17,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
       validationSchema: environmentSchema,
     }),
     PrismaModule,
+    AuthModule,
     UsersModule,
   ],
   controllers: [HealthController],

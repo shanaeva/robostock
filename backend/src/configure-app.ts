@@ -1,7 +1,9 @@
 import type { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 
 export function configureApp(app: INestApplication): void {
+  app.use(helmet());
   app.enableShutdownHooks();
 
   const document = new DocumentBuilder()
