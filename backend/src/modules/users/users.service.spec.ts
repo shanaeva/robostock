@@ -26,6 +26,8 @@ describe('UsersService', () => {
     id: 'b8ce249d-8a13-4bd0-8f19-acac66c7464e',
     email: 'test@example.com',
     name: 'Alex',
+    passwordHash: 'scrypt$131072$8$1$abc$def',
+    verifiedAt: null,
     createdAt: new Date('2026-11-10T09:00:00.000Z'),
   };
   const publicFields = { id: true, email: true, name: true, createdAt: true };
@@ -47,7 +49,7 @@ describe('UsersService', () => {
     const input = { email: user.email, name: user.name };
     await expect(service.create(input)).resolves.toEqual(user);
     expect(prisma.user.create).toHaveBeenCalledWith({
-      data: input,
+      data: expect.objectContaining({ email: user.email, name: user.name }),
       select: publicFields,
     });
   });

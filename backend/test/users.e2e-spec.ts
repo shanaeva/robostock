@@ -89,10 +89,10 @@ describe('Users API with PostgreSQL', () => {
 
   it('lists users from PostgreSQL', async () => {
     const first = await prisma.user.create({
-      data: { email: 'first@example.com', name: 'First' },
+      data: { email: 'first@example.com', name: 'First', passwordHash: 'x' },
     });
     const second = await prisma.user.create({
-      data: { email: 'second@example.com', name: 'Second' },
+      data: { email: 'second@example.com', name: 'Second', passwordHash: 'x' },
     });
     const response = await request(server).get('/users').expect(200);
     const users = usersResponseSchema.parse(response.body);
@@ -107,6 +107,7 @@ describe('Users API with PostgreSQL', () => {
       data: Array.from({ length: 105 }, (_, index) => ({
         email: `user${String(index)}@example.com`,
         name: `User ${String(index)}`,
+        passwordHash: 'x',
       })),
     });
 
@@ -128,6 +129,7 @@ describe('Users API with PostgreSQL', () => {
         id,
         email: `user${String(index)}@example.com`,
         name: `User ${String(index)}`,
+        passwordHash: 'x',
         // The smallest UUID is the newest user; the other timestamps tie.
         createdAt: new Date(
           index === 0 ? '2026-11-10T10:00:00Z' : '2026-11-10T09:00:00Z',
@@ -174,7 +176,7 @@ describe('Users API with PostgreSQL', () => {
 
   it('gets a user by UUID', async () => {
     const stored = await prisma.user.create({
-      data: { email: 'test@example.com', name: 'Alex' },
+      data: { email: 'test@example.com', name: 'Alex', passwordHash: 'x' },
     });
     const response = await request(server)
       .get(`/users/${stored.id}`)
@@ -188,7 +190,7 @@ describe('Users API with PostgreSQL', () => {
 
   it('returns 409 for a duplicate email without creating a second row', async () => {
     await prisma.user.create({
-      data: { email: 'test@example.com', name: 'Alex' },
+      data: { email: 'test@example.com', name: 'Alex', passwordHash: 'x' },
     });
     const response = await request(server)
       .post('/users')
