@@ -25,6 +25,9 @@ export const environmentSchema = z.object({
     .string()
     .min(32, 'AUTH_CODE_SECRET must be at least 32 characters'),
   AUTH_EMAIL_ENABLED: z.enum(['true', 'false']).default('true'),
+  CSRF_SECRET: z.string().min(32, 'CSRF_SECRET must be at least 32 characters'),
+  FRONTEND_ORIGIN: z.url().optional(),
+  AUTH_RATE_LIMIT_ENABLED: z.enum(['true', 'false']).default('true'),
 });
 
 export type Environment = z.infer<typeof environmentSchema>;
