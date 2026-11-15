@@ -21,7 +21,7 @@ export const warehouseCreatedSchema = z.object({ warehouseId: z.uuid() });
 
 export const warehouseErrorSchema = z.object({
   statusCode: z.number().int().min(400).max(599),
-  message: z.string().trim().min(1),
+  message: z.string(),
 });
 
 export type WarehouseSummary = z.infer<typeof warehouseSummarySchema>;

@@ -10,7 +10,7 @@ export class WarehouseApiError extends Error {
 
 export function getWarehouseErrorMessage(error: unknown) {
   if (error instanceof WarehouseApiError) {
-    return error.message;
+    return error.message.trim() || getHttpErrorMessage(error.status ?? 500);
   }
 
   return 'Не удалось выполнить действие. Попробуйте ещё раз.';

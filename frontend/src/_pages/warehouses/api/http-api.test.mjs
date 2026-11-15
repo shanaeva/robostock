@@ -2,6 +2,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createWarehouseDataSource } from './data-source';
 import { createWarehouseHttpApi } from './http-api';
 import { defaultWarehouseListParams } from './types';
+import { warehousesMock } from './mock-data';
+import {
+  WarehouseApiError,
+  getHttpErrorMessage,
+  getWarehouseErrorMessage,
+} from './errors';
+import {
+  warehouseSummarySchema,
+  warehouseErrorSchema,
+} from '../model/api-contract';
 
 const warehouseId = '10000000-0000-4000-8000-000000000001';
 const summary = { id: warehouseId, name: 'Основной', width: 32, height: 12 };
@@ -18,6 +28,46 @@ function mockFetch(response) {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
+});
+
+describe('warehouse contract fixtures and errors', () => {
+  it('validates every initial mock warehouse and keeps IDs unique', () => {
+    for (const warehouse of warehousesMock) {
+      expect(warehouseSummarySchema.safeParse(warehouse).success).toBe(true);
+    }
+    expect(new Set(warehousesMock.map(({ id }) => id)).size).toBe(
+      warehousesMock.length,
+    );
+  });
+
+  it.each(['', ' \t\n '])(
+    'accepts an error message %j without normalizing the server DTO',
+    (message) => {
+      const body = { statusCode: 400, message };
+      expect(warehouseErrorSchema.parse(body)).toEqual(body);
+    },
+  );
+
+  it('rejects missing and non-string error messages', () => {
+    expect(warehouseErrorSchema.safeParse({ statusCode: 400 }).success).toBe(
+      false,
+    );
+    for (const message of [undefined, null, 42, {}, []]) {
+      expect(
+        warehouseErrorSchema.safeParse({ statusCode: 400, message }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('normalizes a nonempty error message only for display', () => {
+    const body = { statusCode: 400, message: '  Недопустимое название  ' };
+    expect(warehouseErrorSchema.parse(body)).toEqual(body);
+    expect(
+      getWarehouseErrorMessage(
+        new WarehouseApiError(body.statusCode, body.message),
+      ),
+    ).toBe('Недопустимое название');
+  });
 });
 
 describe('HTTP warehouse operations (OpenAPI 0.3.0-draft)', () => {
@@ -132,6 +182,23 @@ describe('HTTP warehouse operations (OpenAPI 0.3.0-draft)', () => {
         status,
         message: expect.stringContaining(message),
       });
+    },
+  );
+
+  it.each([400, 401, 403, 404, 500])(
+    'displays the HTTP %s fallback when the server message is blank',
+    async (status) => {
+      for (const message of ['', ' \t\n ']) {
+        mockFetch(Response.json({ statusCode: status, message }, { status }));
+        const error = await api()
+          .remove(warehouseId)
+          .catch((error) => error);
+        expect(error).toMatchObject({ status });
+        expect(getWarehouseErrorMessage(error)).toBe(
+          getHttpErrorMessage(status),
+        );
+        expect(getWarehouseErrorMessage(error).trim()).not.toBe('');
+      }
     },
   );
 
