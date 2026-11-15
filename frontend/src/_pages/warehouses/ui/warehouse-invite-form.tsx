@@ -1,10 +1,13 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { getWarehouseErrorMessage } from '@/entities/warehouse';
+import { getWarehouseErrorMessage } from '../api/errors';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { DialogFooter } from '@/shared/ui/dialog';
-import { warehouseInviteSchema, type WarehouseInviteValues } from '../model/schemas';
+import {
+  warehouseInviteSchema,
+  type WarehouseInviteValues,
+} from '../model/schemas';
 
 type Props = {
   onSubmit: (values: WarehouseInviteValues) => Promise<void>;
@@ -33,7 +36,9 @@ export function WarehouseInviteForm({ onSubmit, onCancel }: Props) {
   return (
     <form onSubmit={submit} noValidate className="space-y-5">
       <div className="space-y-2">
-        <label htmlFor="warehouse-email" className="text-sm font-medium">Email пользователя</label>
+        <label htmlFor="warehouse-email" className="text-sm font-medium">
+          Email пользователя
+        </label>
         <Input
           id="warehouse-email"
           type="email"
@@ -44,18 +49,35 @@ export function WarehouseInviteForm({ onSubmit, onCancel }: Props) {
           readOnly={isSubmitting}
           {...register('email')}
         />
-        {errors.email && <p id="warehouse-email-error" role="alert" className="text-sm text-red-700">{errors.email.message}</p>}
+        {errors.email && (
+          <p
+            id="warehouse-email-error"
+            role="alert"
+            className="text-sm text-red-700"
+          >
+            {errors.email.message}
+          </p>
+        )}
       </div>
       <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
         Роль: <span className="font-medium">Наблюдатель</span>
       </div>
       <p className="text-sm leading-6 text-slate-500">
-        Демо-сценарий: письмо не будет отправлено, доступ пользователя не изменится.
+        Демо-сценарий: письмо не будет отправлено, доступ пользователя не
+        изменится.
       </p>
-      {errors.root && <p role="alert" className="text-sm text-red-700">{errors.root.message}</p>}
+      {errors.root && (
+        <p role="alert" className="text-sm text-red-700">
+          {errors.root.message}
+        </p>
+      )}
       <DialogFooter>
-        <Button variant="outline" disabled={isSubmitting} onClick={onCancel}>Отмена</Button>
-        <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Подготавливаем…' : 'Подготовить приглашение'}</Button>
+        <Button variant="outline" disabled={isSubmitting} onClick={onCancel}>
+          Отмена
+        </Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Подготавливаем…' : 'Подготовить приглашение'}
+        </Button>
       </DialogFooter>
     </form>
   );

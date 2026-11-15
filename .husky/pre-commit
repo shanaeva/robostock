@@ -1,0 +1,2 @@
+pnpm exec lint-staged
+pnpm --filter frontend fsd:check

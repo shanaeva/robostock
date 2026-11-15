@@ -10,9 +10,11 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: 'bg-blue-600 text-white hover:bg-blue-700',
-        outline: 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+        outline:
+          'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
         ghost: 'text-slate-600 hover:bg-slate-100 hover:text-slate-950',
-        destructive: 'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500',
+        destructive:
+          'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500',
       },
       size: {
         default: 'h-10 px-4',
@@ -34,6 +36,7 @@ export function Button({
 }: React.ComponentProps<'button'> &
   VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
   const Comp = asChild ? Slot : 'button';
+
   return (
     <Comp
       data-slot="button"

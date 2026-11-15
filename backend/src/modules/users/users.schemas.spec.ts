@@ -10,7 +10,10 @@ describe('user schemas', () => {
   it('accepts a valid request and trims the name', () => {
     expect(
       createUserSchema.parse({ email: 'test@example.com', name: ' Alex ' }),
-    ).toEqual({ email: 'test@example.com', name: 'Alex' });
+    ).toEqual({
+      email: 'test@example.com',
+      name: 'Alex',
+    });
   });
 
   it.each([
