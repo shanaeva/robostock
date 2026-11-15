@@ -6,6 +6,13 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 export class AuthRepository {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
+  createUser(data: { name: string; email: string; passwordHash: string }) {
+    return this.prisma.user.create({
+      data,
+      select: { id: true, email: true },
+    });
+  }
+
   findUserByEmail(email: string) {
     return this.prisma.user.findUnique({ where: { email } });
   }

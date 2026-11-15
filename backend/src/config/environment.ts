@@ -20,6 +20,11 @@ export const environmentSchema = z.object({
       },
       { error: 'DATABASE_URL must include a host and database name' },
     ),
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  AUTH_CODE_SECRET: z
+    .string()
+    .min(32, 'AUTH_CODE_SECRET must be at least 32 characters'),
+  AUTH_EMAIL_ENABLED: z.enum(['true', 'false']).default('true'),
 });
 
 export type Environment = z.infer<typeof environmentSchema>;
