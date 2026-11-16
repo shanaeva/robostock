@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { ApiError } from '@/shared/api';
 import { useResetPassword } from '../api';
@@ -12,6 +13,7 @@ interface FormValues {
 }
 
 export function ResetPasswordForm({ email }: { email: string }) {
+  const router = useRouter();
   const {
     register,
     handleSubmit,
@@ -19,7 +21,7 @@ export function ResetPasswordForm({ email }: { email: string }) {
     formState: { errors },
   } = useForm<FormValues>();
 
-  const { mutate: reset, isPending, error } = useResetPassword();
+  const { mutate: reset, isPending, error, isSuccess } = useResetPassword();
 
   const errorMessage =
     error instanceof ApiError
@@ -27,6 +29,26 @@ export function ResetPasswordForm({ email }: { email: string }) {
       : error
         ? 'Что-то пошло не так'
         : null;
+
+  if (isSuccess) {
+    return (
+      <div className="flex flex-col gap-4 w-full max-w-sm">
+        <h1 className="text-2xl font-semibold">Пароль изменён</h1>
+        <p className="text-zinc-600 dark:text-zinc-400">
+          Все сессии завершены. Войдите с новым паролем.
+        </p>
+        <button
+          type="button"
+          onClick={() =>
+            router.push(`/auth/login?email=${encodeURIComponent(email)}`)
+          }
+          className="bg-black text-white rounded px-4 py-2 font-medium hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+        >
+          Войти
+        </button>
+      </div>
+    );
+  }
 
   return (
     <form

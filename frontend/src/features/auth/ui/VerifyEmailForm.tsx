@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { ApiError } from '@/shared/api';
@@ -25,7 +26,8 @@ export function VerifyEmailForm({
     getValues,
     formState: { errors },
   } = useForm<FormValues>();
-  const { mutate: verify, isPending, error } = useVerifyEmail();
+  const router = useRouter();
+  const { mutate: verify, isPending, error, isSuccess } = useVerifyEmail();
   const {
     mutate: resend,
     isPending: resending,
@@ -55,6 +57,26 @@ export function VerifyEmailForm({
       : error
         ? 'Что-то пошло не так'
         : null;
+
+  if (isSuccess) {
+    return (
+      <div className="flex flex-col gap-4 w-full max-w-sm">
+        <h1 className="text-2xl font-semibold">Почта подтверждена</h1>
+        <p className="text-zinc-600 dark:text-zinc-400">
+          Пароль установлен. Теперь можно войти.
+        </p>
+        <button
+          type="button"
+          onClick={() =>
+            router.push(`/auth/login?email=${encodeURIComponent(email)}`)
+          }
+          className="bg-black text-white rounded px-4 py-2 font-medium hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+        >
+          Войти
+        </button>
+      </div>
+    );
+  }
 
   return (
     <form

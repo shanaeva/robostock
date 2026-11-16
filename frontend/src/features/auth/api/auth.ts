@@ -76,19 +76,12 @@ export function useResendVerification() {
 }
 
 export function useVerifyEmail() {
-  const setUser = useUserStore((s) => s.setUser);
-  const router = useRouter();
-
   return useMutation({
     mutationFn: (data: { email: string; code: string; password: string }) =>
-      apiFetch<AuthResponse>('/auth/verify-email', {
+      apiFetch<MessageResponse>('/auth/verify-email', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    onSuccess: (result) => {
-      setUser(result.user);
-      router.push('/dashboard');
-    },
   });
 }
 
@@ -103,19 +96,12 @@ export function useForgotPassword() {
 }
 
 export function useResetPassword() {
-  const setUser = useUserStore((s) => s.setUser);
-  const router = useRouter();
-
   return useMutation({
     mutationFn: (data: { email: string; code: string; newPassword: string }) =>
-      apiFetch<AuthResponse>('/auth/reset-password', {
+      apiFetch<MessageResponse>('/auth/reset-password', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    onSuccess: (result) => {
-      setUser(result.user);
-      router.push('/dashboard');
-    },
   });
 }
 
