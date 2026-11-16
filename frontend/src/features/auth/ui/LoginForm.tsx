@@ -79,6 +79,19 @@ export function LoginForm({ defaultEmail }: { defaultEmail?: string }) {
       </button>
 
       <p className="text-sm text-center text-zinc-500">
+        <Link
+          href={
+            email
+              ? `/auth/forgot-password?email=${encodeURIComponent(email)}`
+              : '/auth/forgot-password'
+          }
+          className="text-black dark:text-white underline"
+        >
+          Забыли пароль?
+        </Link>
+      </p>
+
+      <p className="text-sm text-center text-zinc-500">
         Нет аккаунта?{' '}
         <Link
           href={

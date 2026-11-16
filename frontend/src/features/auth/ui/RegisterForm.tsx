@@ -9,7 +9,6 @@ import { useRegister } from '../api';
 interface FormValues {
   name: string;
   email: string;
-  password: string;
 }
 
 export function RegisterForm({
@@ -34,7 +33,6 @@ export function RegisterForm({
       reset({
         name: defaultName ?? '',
         email: defaultEmail ?? '',
-        password: '',
       });
     }
   }, [defaultEmail, defaultName, reset]);
@@ -102,25 +100,6 @@ export function RegisterForm({
         {errors.email && (
           <span className="text-xs text-red-600 dark:text-red-400">
             {errors.email.message}
-          </span>
-        )}
-      </label>
-
-      <label className="flex flex-col gap-1 text-sm">
-        Пароль
-        <input
-          type="password"
-          autoComplete="new-password"
-          className="border rounded px-3 py-2 text-base dark:bg-zinc-900 dark:border-zinc-700"
-          {...register('password', {
-            required: 'Введите пароль',
-            minLength: { value: 8, message: 'Пароль от 8 до 128 символов' },
-            maxLength: { value: 128, message: 'Пароль от 8 до 128 символов' },
-          })}
-        />
-        {errors.password && (
-          <span className="text-xs text-red-600 dark:text-red-400">
-            {errors.password.message}
           </span>
         )}
       </label>

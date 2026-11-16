@@ -5,5 +5,14 @@ export {
   useVerifyEmail,
   useResendVerification,
   useGetMe,
+  useGetSettings,
+  useForgotPassword,
+  useResetPassword,
 } from './api';
-export { LoginForm, RegisterForm, VerifyEmailForm } from './ui';
+export {
+  LoginForm,
+  RegisterForm,
+  VerifyEmailForm,
+  ForgotPasswordForm,
+  ResetPasswordForm,
+} from './ui';

@@ -7,8 +7,16 @@ interface AuthResponse {
   user: CurrentUser;
 }
 
-interface RegisterResponse {
+interface MessageResponse {
   message: string;
+}
+
+export function useGetSettings() {
+  return useQuery({
+    queryKey: ['auth-settings'],
+    queryFn: () => apiFetch<{ emailEnabled: boolean }>('/auth/settings'),
+    staleTime: Infinity,
+  });
 }
 
 export function useLogin() {
@@ -36,8 +44,8 @@ export function useRegister() {
   const router = useRouter();
 
   return useMutation({
-    mutationFn: (data: { name: string; email: string; password: string }) =>
-      apiFetch<RegisterResponse>('/auth/register', {
+    mutationFn: (data: { name: string; email: string }) =>
+      apiFetch<MessageResponse>('/auth/register', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
@@ -60,7 +68,7 @@ export function useGetMe() {
 export function useResendVerification() {
   return useMutation({
     mutationFn: (data: { email: string }) =>
-      apiFetch<{ message: string }>('/auth/resend-verification', {
+      apiFetch<MessageResponse>('/auth/resend-verification', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
@@ -72,8 +80,35 @@ export function useVerifyEmail() {
   const router = useRouter();
 
   return useMutation({
-    mutationFn: (data: { email: string; code: string }) =>
+    mutationFn: (data: { email: string; code: string; password: string }) =>
       apiFetch<AuthResponse>('/auth/verify-email', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    onSuccess: (result) => {
+      setUser(result.user);
+      router.push('/dashboard');
+    },
+  });
+}
+
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: (data: { email: string }) =>
+      apiFetch<MessageResponse>('/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+  });
+}
+
+export function useResetPassword() {
+  const setUser = useUserStore((s) => s.setUser);
+  const router = useRouter();
+
+  return useMutation({
+    mutationFn: (data: { email: string; code: string; newPassword: string }) =>
+      apiFetch<AuthResponse>('/auth/reset-password', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
@@ -90,13 +125,12 @@ export function useLogout() {
 
   return useMutation({
     mutationFn: () =>
-      apiFetch<{ message: string }>('/auth/logout', { method: 'POST' }),
+      apiFetch<MessageResponse>('/auth/logout', { method: 'POST' }),
     onSuccess: () => {
       clearUser();
       router.push('/');
     },
     onError: () => {
-      // Clear local state even if the server request failed.
       clearUser();
       router.push('/');
     },

@@ -8,6 +8,8 @@ import { useResendVerification, useVerifyEmail } from '../api';
 
 interface FormValues {
   code: string;
+  password: string;
+  confirmPassword: string;
 }
 
 export function VerifyEmailForm({
@@ -20,6 +22,7 @@ export function VerifyEmailForm({
   const {
     register,
     handleSubmit,
+    getValues,
     formState: { errors },
   } = useForm<FormValues>();
   const { mutate: verify, isPending, error } = useVerifyEmail();
@@ -55,14 +58,16 @@ export function VerifyEmailForm({
 
   return (
     <form
-      onSubmit={handleSubmit((data) => verify({ email, code: data.code }))}
+      onSubmit={handleSubmit((data) =>
+        verify({ email, code: data.code, password: data.password }),
+      )}
       className="flex flex-col gap-4 w-full max-w-sm"
     >
       <h1 className="text-2xl font-semibold">Подтверждение email</h1>
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
         На почту{' '}
         <strong className="text-zinc-900 dark:text-zinc-100">{email}</strong>{' '}
-        отправлен код подтверждения. Введите его для завершения регистрации.
+        отправлен код подтверждения. Введите его и придумайте пароль.
       </p>
 
       {errorMessage && (
@@ -107,12 +112,50 @@ export function VerifyEmailForm({
         </button>
       </div>
 
+      <label className="flex flex-col gap-1 text-sm">
+        Придумайте пароль
+        <input
+          type="password"
+          autoComplete="new-password"
+          className="border rounded px-3 py-2 text-base dark:bg-zinc-900 dark:border-zinc-700"
+          {...register('password', {
+            required: 'Введите пароль',
+            minLength: { value: 8, message: 'Пароль от 8 до 128 символов' },
+            maxLength: { value: 128, message: 'Пароль от 8 до 128 символов' },
+          })}
+        />
+        {errors.password && (
+          <span className="text-xs text-red-600 dark:text-red-400">
+            {errors.password.message}
+          </span>
+        )}
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm">
+        Повторите пароль
+        <input
+          type="password"
+          autoComplete="new-password"
+          className="border rounded px-3 py-2 text-base dark:bg-zinc-900 dark:border-zinc-700"
+          {...register('confirmPassword', {
+            required: 'Повторите пароль',
+            validate: (v) =>
+              v === getValues('password') || 'Пароли не совпадают',
+          })}
+        />
+        {errors.confirmPassword && (
+          <span className="text-xs text-red-600 dark:text-red-400">
+            {errors.confirmPassword.message}
+          </span>
+        )}
+      </label>
+
       <button
         type="submit"
         disabled={isPending}
         className="bg-black text-white rounded px-4 py-2 font-medium hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
       >
-        {isPending ? 'Проверяем...' : 'Подтвердить'}
+        {isPending ? 'Проверяем...' : 'Подтвердить и войти'}
       </button>
 
       <p className="text-sm text-center text-zinc-500">
