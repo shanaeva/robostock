@@ -1,53 +1,37 @@
-# Мои склады — /warehouses
+# My Warehouses — /warehouses
 
-Страница управления складами: список, поиск, сортировка, пагинация, создание,
-переименование и удаление. Название — 1–100 символов после обрезки пробелов;
-размеры при создании — целые числа 1–500, по умолчанию 20 × 20.
+Warehouse listing, search, sorting, pagination, creation, renaming,
+and deletion. Names must contain 1–100 characters; dimensions must be integers from 1 to 500.
 
-## Запуск и окружение
+## Getting Started
 
-Установка и запуск описаны в [README frontend](../../../../README.md).
-Используйте Node из корневого `.nvmrc` и pnpm из `packageManager`.
-После запуска откройте `/warehouses`.
+See the [frontend README](../../../README.md) for instructions.
+After starting the application, open `/warehouses`.
 
-Настройки задаются в `frontend/.env.local`:
+Configure the following variables in `frontend/.env.local`:
 
-| Переменная                          | Значение по умолчанию     | Допустимые значения / назначение                                |
-| ----------------------------------- | ------------------------- | --------------------------------------------------------------- |
-| `NEXT_PUBLIC_WAREHOUSE_DATA_SOURCE` | `mock`                    | `mock` или `http`                                               |
-| `NEXT_PUBLIC_API_BASE_URL`          | Не задано                 | Обязательный для `http` адрес API, включая префикс              |
-| `NEXT_PUBLIC_WAREHOUSE_DEMO_OWNER`  | Не задано, режим выключен | Только строка `true` включает временные права при условиях ниже |
+| Variable                            | Purpose                                                           |
+| ----------------------------------- | ----------------------------------------------------------------- |
+| `NEXT_PUBLIC_WAREHOUSE_DATA_SOURCE` | `mock` (default) or `http`                                        |
+| `NEXT_PUBLIC_API_BASE_URL`          | API URL, required for `http`                                      |
+| `NEXT_PUBLIC_WAREHOUSE_DEMO_OWNER`  | `true` enables temporary owner actions only in development + http |
 
-Адрес API должен быть HTTP(S) URL без логина, пароля, query и hash;
-завершающий слеш необязателен. После изменения настроек перезапустите dev-сервер,
-для production — пересоберите frontend. `NEXT_PUBLIC_*` публичны: секреты в них
-хранить нельзя.
+Restart the dev server after changing these variables; production requires
+a rebuild. `NEXT_PUBLIC_*` variables are public; do not store secrets in them.
 
-## Режимы данных
+## Modes
 
-- **mock** — API не нужен; данные хранятся в памяти страницы и сбрасываются
-  после перезагрузки. Исходные записи имеют фиксированные UUID и демонстрационные
-  роли Owner/Observer; приглашение имитируется без отправки письма.
-- **http** — CRUD выполняется через настоящий API с `credentials: 'include'`.
-  Ошибки HTTP не подменяются моками. Неизвестный режим или неверный адрес API
-  показывают ошибку. Демонстрационные роли и фильтр ролей недоступны.
+- **mock** — works without a backend; changes are reset on page reload.
+  Scenarios: `?demo=empty`, `?demo=error`, `?demo=mutation-error`,
+  `?demo=forbidden`. Invitations are simulated.
+- **http** — sends requests to the real API without falling back to mocks on errors.
+  Owner actions are hidden when the role is unknown. The temporary flag
+  enables renaming and deletion but does not change server-side permissions
+  and is ignored in production. HTTP invitations are disabled.
 
-В mock-режиме доступны сценарии `/warehouses?demo=empty`, `error`,
-`mutation-error` и `forbidden` (каждое значение задаётся в `demo`).
-Между сценариями переходите с полной перезагрузкой; в HTTP параметр игнорируется.
+## Checks
 
-## Временный режим владельца
-
-`NEXT_PUBLIC_WAREHOUSE_DEMO_OWNER=true` разрешает переименование и удаление
-через API **только при одновременных** `NODE_ENV=development` и режиме `http`.
-В production флаг игнорируется. Это UI-разрешения для локальной проверки:
-серверная роль не подменяется, неизвестная роль остаётся неизвестной.
-Приглашение в этом режиме видно, но отключено; запрос не отправляется.
-Без флага при неизвестной роли действия владельца скрыты.
-
-## Проверки
-
-Все команды выполняются из корня workspace с установленными зависимостями:
+Run from the repository root:
 
 ```sh
 pnpm --filter @starter/backend exec vitest run --root ../frontend
@@ -55,18 +39,13 @@ pnpm exec prettier --check frontend/src/_pages/warehouses
 pnpm --filter frontend lint
 pnpm --filter frontend fsd:check
 pnpm --filter frontend exec tsc --noEmit --incremental false
+pnpm --filter frontend build
 ```
 
-Тесты используют установленный в backend Vitest; проверяют адаптеры, схемы,
-моки и условия временного режима владельца. Подмена `fetch` не является E2E
-и не проверяет работающий сервер.
+Stop the frontend dev server before running the build.
+Tests use Vitest from the backend and mocked requests; they are not E2E tests.
 
-## Незавершённые интеграции
+## Pending Integrations
 
-- Авторизация, реальная сессия и роли по каждому складу не подключены.
-  Нужны согласованные получение прав, обработка потери доступа и локальный вход;
-  для запросов между origin — CORS с credentials и совместимые настройки cookie.
-  Доступность кнопок не заменяет проверку прав сервером.
-- HTTP-приглашения не подключены: нужны контракт и согласование сценария принятия.
-  Демонстрационное приглашение существует только в mock-режиме.
-- Маршрут редактора склада не согласован; кнопка «Открыть» недоступна.
+- Authentication, real roles, and state updates when the session changes.
+- Warehouse editor route — the “Open” button is currently unavailable.
