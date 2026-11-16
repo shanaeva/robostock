@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useForm } from 'react-hook-form';
+import { useEffect } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { ApiError } from '@/shared/api';
 import { useLogin } from '../api';
 
@@ -11,10 +12,18 @@ interface FormValues {
   rememberMe: boolean;
 }
 
-export function LoginForm() {
-  const { register, handleSubmit } = useForm<FormValues>({
+export function LoginForm({ defaultEmail }: { defaultEmail?: string }) {
+  const { register, handleSubmit, reset, control } = useForm<FormValues>({
     defaultValues: { rememberMe: false },
   });
+
+  const email = useWatch({ control, name: 'email', defaultValue: '' });
+
+  useEffect(() => {
+    if (defaultEmail) {
+      reset({ email: defaultEmail, rememberMe: false });
+    }
+  }, [defaultEmail, reset]);
 
   const { mutate: login, isPending, error } = useLogin();
 
@@ -50,7 +59,7 @@ export function LoginForm() {
         Пароль
         <input
           type="password"
-          autoComplete="current-password"
+          autoComplete="new-password"
           className="border rounded px-3 py-2 text-base dark:bg-zinc-900 dark:border-zinc-700"
           {...register('password', { required: true })}
         />
@@ -72,7 +81,11 @@ export function LoginForm() {
       <p className="text-sm text-center text-zinc-500">
         Нет аккаунта?{' '}
         <Link
-          href="/auth/register"
+          href={
+            email
+              ? `/auth/register?email=${encodeURIComponent(email)}`
+              : '/auth/register'
+          }
           className="text-black dark:text-white underline"
         >
           Зарегистрироваться

@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useForm } from 'react-hook-form';
+import { useEffect } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { ApiError } from '@/shared/api';
 import { useRegister } from '../api';
 
@@ -11,8 +12,32 @@ interface FormValues {
   password: string;
 }
 
-export function RegisterForm() {
-  const { register, handleSubmit, getValues } = useForm<FormValues>();
+export function RegisterForm({
+  defaultEmail,
+  defaultName,
+}: {
+  defaultEmail?: string;
+  defaultName?: string;
+}) {
+  const {
+    register,
+    handleSubmit,
+    getValues,
+    reset,
+    control,
+    formState: { errors },
+  } = useForm<FormValues>();
+  const email = useWatch({ control, name: 'email', defaultValue: '' });
+
+  useEffect(() => {
+    if (defaultEmail || defaultName) {
+      reset({
+        name: defaultName ?? '',
+        email: defaultEmail ?? '',
+        password: '',
+      });
+    }
+  }, [defaultEmail, defaultName, reset]);
 
   const { mutate: registerUser, isPending, error, isSuccess } = useRegister();
 
@@ -53,8 +78,17 @@ export function RegisterForm() {
           type="text"
           autoComplete="name"
           className="border rounded px-3 py-2 text-base dark:bg-zinc-900 dark:border-zinc-700"
-          {...register('name', { required: true, minLength: 2, maxLength: 80 })}
+          {...register('name', {
+            required: 'Введите имя',
+            minLength: { value: 2, message: 'Имя от 2 до 80 символов' },
+            maxLength: { value: 80, message: 'Имя от 2 до 80 символов' },
+          })}
         />
+        {errors.name && (
+          <span className="text-xs text-red-600 dark:text-red-400">
+            {errors.name.message}
+          </span>
+        )}
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
@@ -63,8 +97,13 @@ export function RegisterForm() {
           type="email"
           autoComplete="email"
           className="border rounded px-3 py-2 text-base dark:bg-zinc-900 dark:border-zinc-700"
-          {...register('email', { required: true })}
+          {...register('email', { required: 'Введите email' })}
         />
+        {errors.email && (
+          <span className="text-xs text-red-600 dark:text-red-400">
+            {errors.email.message}
+          </span>
+        )}
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
@@ -74,11 +113,16 @@ export function RegisterForm() {
           autoComplete="new-password"
           className="border rounded px-3 py-2 text-base dark:bg-zinc-900 dark:border-zinc-700"
           {...register('password', {
-            required: true,
-            minLength: 8,
-            maxLength: 128,
+            required: 'Введите пароль',
+            minLength: { value: 8, message: 'Пароль от 8 до 128 символов' },
+            maxLength: { value: 128, message: 'Пароль от 8 до 128 символов' },
           })}
         />
+        {errors.password && (
+          <span className="text-xs text-red-600 dark:text-red-400">
+            {errors.password.message}
+          </span>
+        )}
       </label>
 
       <button
@@ -92,7 +136,11 @@ export function RegisterForm() {
       <p className="text-sm text-center text-zinc-500">
         Уже есть аккаунт?{' '}
         <Link
-          href="/auth/login"
+          href={
+            email
+              ? `/auth/login?email=${encodeURIComponent(email)}`
+              : '/auth/login'
+          }
           className="text-black dark:text-white underline"
         >
           Войти
