@@ -1,3 +1,5 @@
+'use client';
+
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useUserStore, type CurrentUser } from '@/entities/user';

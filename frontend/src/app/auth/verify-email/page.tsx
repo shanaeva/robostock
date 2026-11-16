@@ -1,12 +1,13 @@
-'use client';
-
-import { useSearchParams } from 'next/navigation';
 import { VerifyEmailForm } from '@/features/auth';
 
-export default function VerifyEmailPage() {
-  const params = useSearchParams();
-  const email = params.get('email') ?? '';
-  const name = params.get('name') ?? '';
+export default async function VerifyEmailPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const { email: emailParam, name: nameParam } = await searchParams;
+  const email = typeof emailParam === 'string' ? emailParam : '';
+  const name = typeof nameParam === 'string' ? nameParam : '';
 
   return (
     <main className="flex flex-1 items-center justify-center px-4">

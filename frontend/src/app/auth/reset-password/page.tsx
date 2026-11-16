@@ -1,21 +1,16 @@
-'use client';
-
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect } from 'react';
+import { redirect } from 'next/navigation';
 import { ResetPasswordForm } from '@/features/auth';
 
-export default function ResetPasswordPage() {
-  const router = useRouter();
-  const email = useSearchParams().get('email');
-
-  useEffect(() => {
-    if (!email) {
-      router.replace('/auth/forgot-password');
-    }
-  }, [email, router]);
+export default async function ResetPasswordPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const { email: emailParam } = await searchParams;
+  const email = typeof emailParam === 'string' ? emailParam : null;
 
   if (!email) {
-    return null;
+    redirect('/auth/forgot-password');
   }
 
   return (
