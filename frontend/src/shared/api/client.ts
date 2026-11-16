@@ -45,6 +45,45 @@ async function execute(
   });
 }
 
+// Single in-flight refresh promise deduplicates concurrent calls within one tab.
+let refreshing: Promise<boolean> | null = null;
+
+async function tryRefresh(): Promise<boolean> {
+  const doRefresh = async (): Promise<boolean> => {
+    // Re-check /auth/me first: another tab may have already refreshed the cookies.
+    const meRes = await fetch(`${API}/auth/me`, { credentials: 'include' });
+
+    if (meRes.ok) {
+      invalidateCsrf();
+
+      return true;
+    }
+
+    const refreshRes = await fetch(`${API}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (refreshRes.ok) {
+      invalidateCsrf();
+
+      return true;
+    }
+
+    return false;
+  };
+
+  // Web Locks serializes across tabs in the same browser; falls back to
+  // the in-flight promise within one tab when the API is unavailable (SSR,
+  // older browsers).
+  if (typeof navigator !== 'undefined' && navigator.locks) {
+    return navigator.locks.request('auth-refresh', doRefresh);
+  }
+
+  return doRefresh();
+}
+
 export async function apiFetch<T>(
   path: string,
   init: RequestInit = {},
@@ -57,15 +96,13 @@ export async function apiFetch<T>(
   // On 401 try to refresh once, then retry the original request.
   // Skip for auth endpoints themselves to avoid infinite loops.
   if (res.status === 401 && !path.startsWith('/auth/')) {
-    const refreshRes = await fetch(`${API}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+    refreshing ??= tryRefresh().finally(() => {
+      refreshing = null;
     });
 
-    if (refreshRes.ok) {
-      // CSRF cookie may have been rotated during refresh.
-      invalidateCsrf();
+    const refreshed = await refreshing;
+
+    if (refreshed) {
       res = await execute(path, init, needsCsrf);
     }
   }
