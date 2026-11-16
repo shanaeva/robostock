@@ -76,6 +76,13 @@ export class AuthRepository {
     });
   }
 
+  revokeAllUserSessions(userId: string) {
+    return this.prisma.session.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
   findSessionWithUser(sessionId: string) {
     return this.prisma.session.findUnique({
       where: { id: sessionId },

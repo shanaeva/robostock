@@ -21,7 +21,6 @@ import { AuthRepository } from './auth.repository.js';
 
 export const ACCESS_TTL_SECONDS = 15 * 60;
 
-// Short-lived sessions expire after 24 hours; remembered sessions after 7 days.
 const SESSION_TTL_MS = {
   short: 24 * 60 * 60 * 1000,
   long: 7 * 24 * 60 * 60 * 1000,
@@ -47,7 +46,6 @@ export class AuthService {
   private readonly jwtSecret: string;
   private readonly codeSecret: string;
   private readonly emailEnabled: boolean;
-  // Pre-warmed dummy hash prevents user-enumeration via timing on login.
   private readonly dummyHash: Promise<string>;
 
   constructor(
@@ -62,53 +60,49 @@ export class AuthService {
     this.dummyHash = hashPassword(randomToken());
   }
 
-  async register(input: { name: string; email: string; password: string }) {
-    const passwordHash = await hashPassword(input.password);
+  getSettings() {
+    return { emailEnabled: this.emailEnabled };
+  }
+
+  async register(input: { name: string; email: string }) {
     const user = await this.repository.findUserByEmail(input.email);
     if (user) {
-      // Don't reveal whether the email exists.
       return {
         message: 'Если регистрация доступна для этой почты, аккаунт создан.',
       };
     }
 
+    // Store an unknown random hash — the real password is set at verify-email.
     const { id } = await this.repository.createUser({
       name: input.name,
       email: input.email,
-      passwordHash,
+      passwordHash: await hashPassword(randomToken()),
     });
 
-    if (this.emailEnabled) {
-      const code = generateCode();
-      const digest = codeDigest(
-        this.codeSecret,
-        input.email,
-        'VERIFY_EMAIL',
-        code,
-      );
-      await this.repository.upsertEmailCode({
-        userId: id,
-        purpose: 'VERIFY_EMAIL',
-        digest,
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-      });
-      this.mail.sendCodeFireAndForget(input.email, code, 'VERIFY_EMAIL');
-    }
+    const code = generateCode();
+    const digest = codeDigest(
+      this.codeSecret,
+      input.email,
+      'VERIFY_EMAIL',
+      code,
+    );
+    await this.repository.upsertEmailCode({
+      userId: id,
+      purpose: 'VERIFY_EMAIL',
+      digest,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    });
+    this.mail.sendCodeFireAndForget(input.email, code, 'VERIFY_EMAIL');
 
-    return {
-      message: this.emailEnabled
-        ? 'Аккаунт создан. Проверьте почту для подтверждения.'
-        : 'Аккаунт создан. Теперь можно войти.',
-    };
+    return { message: 'Аккаунт создан. Проверьте почту для подтверждения.' };
   }
 
   async resendVerification(email: string) {
     const user = await this.repository.findUserByEmail(email);
-    // Always return the same message to prevent user enumeration.
     const ok = {
       message: 'Если аккаунт существует и не подтверждён, письмо отправлено.',
     };
-    if (!user || user.verifiedAt || !this.emailEnabled) return ok;
+    if (!user || user.verifiedAt) return ok;
     const code = generateCode();
     const digest = codeDigest(this.codeSecret, email, 'VERIFY_EMAIL', code);
     await this.repository.upsertEmailCode({
@@ -121,24 +115,71 @@ export class AuthService {
     return ok;
   }
 
-  async login(input: { email: string; password: string; rememberMe: boolean }) {
-    const user = await this.repository.findUserByEmail(input.email);
-
-    // Always run verifyPassword to prevent timing-based user enumeration.
-    const hash = user?.passwordHash ?? (await this.dummyHash);
-    const matches = await verifyPassword(input.password, hash);
-
-    if (!user || !matches) {
-      throw new UnauthorizedException({
-        message: 'Неверная почта или пароль.',
-        code: 'INVALID_CREDENTIALS',
+  async verifyEmail(email: string, code: string, password: string) {
+    const user = await this.repository.findUserByEmail(email);
+    if (!user) {
+      throw new BadRequestException({
+        message: INVALID_CODE,
+        code: 'INVALID_CODE',
+      });
+    }
+    const digest = codeDigest(this.codeSecret, email, 'VERIFY_EMAIL', code);
+    const record = await this.repository.findActiveEmailCode(
+      user.id,
+      'VERIFY_EMAIL',
+    );
+    if (!record || record.digest !== digest) {
+      if (record) await this.repository.incrementCodeAttempts(record.id);
+      throw new BadRequestException({
+        message: INVALID_CODE,
+        code: 'INVALID_CODE',
       });
     }
 
-    if (this.emailEnabled && !user.verifiedAt) {
+    const passwordHash = await hashPassword(password);
+
+    // Atomically: consume code + set password + mark verified + revoke old sessions.
+    await this.repository.$transaction(async (tx) => {
+      await tx.emailCode.update({
+        where: { id: record.id },
+        data: { consumedAt: new Date() },
+      });
+      await tx.user.update({
+        where: { id: user.id },
+        data: { passwordHash, verifiedAt: new Date() },
+      });
+      await tx.session.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    });
+
+    const refreshToken = randomToken();
+    const session = await this.repository.createSession({
+      userId: user.id,
+      rememberMe: false,
+      expiresAt: new Date(Date.now() + SESSION_TTL_MS.short),
+      tokenDigest: tokenDigest(refreshToken),
+    });
+
+    return this.credentials(
+      { ...user, verifiedAt: new Date() },
+      session.id,
+      refreshToken,
+    );
+  }
+
+  async login(input: { email: string; password: string; rememberMe: boolean }) {
+    const user = await this.repository.findUserByEmail(input.email);
+
+    const hash = user?.passwordHash ?? (await this.dummyHash);
+    const matches = await verifyPassword(input.password, hash);
+
+    // Treat unverified email same as wrong credentials to prevent user enumeration.
+    if (!user || !matches || (this.emailEnabled && !user.verifiedAt)) {
       throw new UnauthorizedException({
-        message: 'Подтвердите почту перед входом.',
-        code: 'EMAIL_NOT_VERIFIED',
+        message: 'Неверная почта или пароль.',
+        code: 'INVALID_CREDENTIALS',
       });
     }
 
@@ -163,7 +204,6 @@ export class AuthService {
 
     if (!found || found.usedAt || found.session.revokedAt) {
       if (found?.usedAt) {
-        // Token reuse detected — revoke the whole session.
         await this.repository.revokeSession(found.session.id);
       }
       throw new UnauthorizedException('Сессия истекла. Войдите заново.');
@@ -207,6 +247,86 @@ export class AuthService {
     return { message: 'Вы вышли из аккаунта.' };
   }
 
+  async logoutAll(userId: string) {
+    await this.repository.revokeAllUserSessions(userId);
+    return { message: 'Все сессии завершены.' };
+  }
+
+  async forgotPassword(email: string) {
+    const ok = { message: 'Если аккаунт существует, письмо отправлено.' };
+    const user = await this.repository.findUserByEmail(email);
+    if (!user || !user.verifiedAt) return ok;
+    const code = generateCode();
+    const digest = codeDigest(this.codeSecret, email, 'RESET_PASSWORD', code);
+    await this.repository.upsertEmailCode({
+      userId: user.id,
+      purpose: 'RESET_PASSWORD',
+      digest,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    });
+    this.mail.sendCodeFireAndForget(email, code, 'RESET_PASSWORD');
+    return ok;
+  }
+
+  async resetPassword(input: {
+    email: string;
+    code: string;
+    newPassword: string;
+  }) {
+    const user = await this.repository.findUserByEmail(input.email);
+    if (!user) {
+      throw new BadRequestException({
+        message: INVALID_CODE,
+        code: 'INVALID_CODE',
+      });
+    }
+    const digest = codeDigest(
+      this.codeSecret,
+      input.email,
+      'RESET_PASSWORD',
+      input.code,
+    );
+    const record = await this.repository.findActiveEmailCode(
+      user.id,
+      'RESET_PASSWORD',
+    );
+    if (!record || record.digest !== digest) {
+      if (record) await this.repository.incrementCodeAttempts(record.id);
+      throw new BadRequestException({
+        message: INVALID_CODE,
+        code: 'INVALID_CODE',
+      });
+    }
+
+    const passwordHash = await hashPassword(input.newPassword);
+
+    // Atomically: consume code + update password + revoke all sessions.
+    await this.repository.$transaction(async (tx) => {
+      await tx.emailCode.update({
+        where: { id: record.id },
+        data: { consumedAt: new Date() },
+      });
+      await tx.user.update({
+        where: { id: user.id },
+        data: { passwordHash },
+      });
+      await tx.session.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    });
+
+    const refreshToken = randomToken();
+    const session = await this.repository.createSession({
+      userId: user.id,
+      rememberMe: false,
+      expiresAt: new Date(Date.now() + SESSION_TTL_MS.short),
+      tokenDigest: tokenDigest(refreshToken),
+    });
+
+    return this.credentials(user, session.id, refreshToken);
+  }
+
   async authenticate(token: string | undefined) {
     if (!token || token.length > 4096) {
       throw new UnauthorizedException('Войдите в аккаунт');
@@ -226,48 +346,6 @@ export class AuthService {
     } catch {
       throw new UnauthorizedException('Сессия истекла. Войдите заново.');
     }
-  }
-
-  async verifyEmail(email: string, code: string) {
-    const user = await this.repository.findUserByEmail(email);
-    if (!user) {
-      throw new BadRequestException({
-        message: INVALID_CODE,
-        code: 'INVALID_CODE',
-      });
-    }
-    const digest = codeDigest(this.codeSecret, email, 'VERIFY_EMAIL', code);
-    const record = await this.repository.findActiveEmailCode(
-      user.id,
-      'VERIFY_EMAIL',
-    );
-    if (!record || record.digest !== digest) {
-      if (record) await this.repository.incrementCodeAttempts(record.id);
-      throw new BadRequestException({
-        message: INVALID_CODE,
-        code: 'INVALID_CODE',
-      });
-    }
-    await this.repository.$transaction(async (tx) => {
-      await tx.emailCode.update({
-        where: { id: record.id },
-        data: { consumedAt: new Date() },
-      });
-      await tx.user.update({
-        where: { id: user.id },
-        data: { verifiedAt: new Date() },
-      });
-    });
-
-    const refreshToken = randomToken();
-    const session = await this.repository.createSession({
-      userId: user.id,
-      rememberMe: false,
-      expiresAt: new Date(Date.now() + SESSION_TTL_MS.short),
-      tokenDigest: tokenDigest(refreshToken),
-    });
-
-    return this.credentials(user, session.id, refreshToken);
   }
 
   private async credentials(

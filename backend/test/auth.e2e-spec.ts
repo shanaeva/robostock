@@ -19,8 +19,8 @@ import { PrismaService } from '../src/prisma/prisma.service.js';
 const REGISTER_INPUT = {
   name: 'Test User',
   email: 'test@example.com',
-  password: 'password123',
 };
+const PASSWORD = 'password123';
 
 describe('Auth API with PostgreSQL', () => {
   let app: INestApplication<Server> | undefined;
@@ -74,10 +74,40 @@ describe('Auth API with PostgreSQL', () => {
       .send(input);
   }
 
-  async function login(
-    email = REGISTER_INPUT.email,
-    pass = REGISTER_INPUT.password,
-  ) {
+  // Verifies email and sets password in one step (as the real flow works).
+  async function verifyAndSetPassword(email = REGISTER_INPUT.email) {
+    const code = await prisma.emailCode
+      .findFirst({ where: { user: { email } } })
+      .then(async (record) => {
+        // Decode digest back is not possible — reset with known code instead.
+        const { codeDigest } =
+          await import('../src/modules/auth/auth.crypto.js');
+        const { ConfigService } = await import('@nestjs/config');
+        const cfg = app!.get(ConfigService);
+        const knownCode = '123456';
+        await prisma.emailCode.update({
+          where: { id: record!.id },
+          data: {
+            digest: codeDigest(
+              cfg.get('AUTH_CODE_SECRET') as string,
+              email,
+              'VERIFY_EMAIL',
+              knownCode,
+            ),
+          },
+        });
+        return knownCode;
+      });
+
+    const { cookie, token } = await getCsrf();
+    return request(server)
+      .post('/auth/verify-email')
+      .set('Cookie', cookie)
+      .set('X-CSRF-Token', token)
+      .send({ email, code, password: PASSWORD });
+  }
+
+  async function login(email = REGISTER_INPUT.email, pass = PASSWORD) {
     const { cookie, token } = await getCsrf();
     return request(server)
       .post('/auth/login')
@@ -86,8 +116,16 @@ describe('Auth API with PostgreSQL', () => {
       .send({ email, password: pass, rememberMe: false });
   }
 
+  describe('GET /auth/settings', () => {
+    it('возвращает emailEnabled', async () => {
+      const res = await request(server).get('/auth/settings');
+      expect(res.status).toBe(200);
+      expect(typeof res.body.emailEnabled).toBe('boolean');
+    });
+  });
+
   describe('POST /auth/register', () => {
-    it('создаёт аккаунт и возвращает 200', async () => {
+    it('создаёт аккаунт и возвращает 202', async () => {
       const res = await register();
       expect(res.status).toBe(202);
       expect(res.body).toHaveProperty('message');
@@ -105,7 +143,33 @@ describe('Auth API with PostgreSQL', () => {
         .post('/auth/register')
         .set('Cookie', cookie)
         .set('X-CSRF-Token', token)
-        .send({ email: 'not-an-email', password: 'x' });
+        .send({ email: 'not-an-email' });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('POST /auth/verify-email', () => {
+    it('подтверждает email, устанавливает пароль и возвращает сессию', async () => {
+      await register();
+      const res = await verifyAndSetPassword();
+      expect(res.status).toBe(200);
+      expect(res.body.user.email).toBe(REGISTER_INPUT.email);
+      const cookies = res.headers['set-cookie'] as string[] | undefined;
+      expect(cookies?.some((c) => c.startsWith('access_token='))).toBe(true);
+    });
+
+    it('возвращает 400 при неверном коде', async () => {
+      await register();
+      const { cookie, token } = await getCsrf();
+      const res = await request(server)
+        .post('/auth/verify-email')
+        .set('Cookie', cookie)
+        .set('X-CSRF-Token', token)
+        .send({
+          email: REGISTER_INPUT.email,
+          code: '000000',
+          password: PASSWORD,
+        });
       expect(res.status).toBe(400);
     });
   });
@@ -113,6 +177,7 @@ describe('Auth API with PostgreSQL', () => {
   describe('POST /auth/login', () => {
     beforeEach(async () => {
       await register();
+      await verifyAndSetPassword();
     });
 
     it('выдаёт 401 при неверном пароле', async () => {
@@ -131,6 +196,7 @@ describe('Auth API with PostgreSQL', () => {
       expect(res.body.user).toMatchObject({
         email: REGISTER_INPUT.email,
         name: REGISTER_INPUT.name,
+        emailVerified: true,
       });
       const cookies = res.headers['set-cookie'] as string[] | undefined;
       expect(cookies?.some((c) => c.startsWith('access_token='))).toBe(true);
@@ -145,8 +211,8 @@ describe('Auth API with PostgreSQL', () => {
 
     it('возвращает данные текущего пользователя с валидным токеном', async () => {
       await register();
-      const loginRes = await login();
-      const cookies = (loginRes.headers['set-cookie'] as string[]).join('; ');
+      const verifyRes = await verifyAndSetPassword();
+      const cookies = (verifyRes.headers['set-cookie'] as string[]).join('; ');
 
       const res = await request(server).get('/auth/me').set('Cookie', cookies);
 
@@ -158,8 +224,8 @@ describe('Auth API with PostgreSQL', () => {
   describe('POST /auth/logout', () => {
     it('выходит из аккаунта и инвалидирует сессию', async () => {
       await register();
-      const loginRes = await login();
-      const cookies = (loginRes.headers['set-cookie'] as string[]).join('; ');
+      const verifyRes = await verifyAndSetPassword();
+      const cookies = (verifyRes.headers['set-cookie'] as string[]).join('; ');
 
       const { cookie: csrfCookie, token } = await getCsrf();
       const logoutRes = await request(server)

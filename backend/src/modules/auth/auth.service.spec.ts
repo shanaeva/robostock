@@ -38,6 +38,7 @@ function makeRepo() {
     createSession: vi.fn().mockResolvedValue(SESSION),
     findRefreshToken: vi.fn(),
     revokeSession: vi.fn().mockResolvedValue(undefined),
+    revokeAllUserSessions: vi.fn().mockResolvedValue(undefined),
     rotateRefreshToken: vi.fn().mockResolvedValue(undefined),
     findSessionWithUser: vi.fn(),
     findActiveEmailCode: vi.fn(),
@@ -48,18 +49,19 @@ function makeRepo() {
         fn({
           emailCode: { update: vi.fn().mockResolvedValue({}) },
           user: { update: vi.fn().mockResolvedValue({}) },
+          session: { updateMany: vi.fn().mockResolvedValue({}) },
         }),
       ),
   };
 }
 
-function makeConfig(emailEnabled = true) {
+function makeConfig() {
   return {
     getOrThrow: vi.fn((key: string) => {
       const map: Record<string, string> = {
         JWT_SECRET: JWT_KEY,
         AUTH_CODE_SECRET: CODE_KEY,
-        AUTH_EMAIL_ENABLED: emailEnabled ? 'true' : 'false',
+        AUTH_EMAIL_ENABLED: 'true',
         CSRF_SECRET: 'test csrf key must be at least 32 chars',
         FRONTEND_ORIGIN: 'http://localhost:3000',
       };
@@ -105,7 +107,6 @@ describe('AuthService', () => {
       const result = await service.register({
         name: USER.name,
         email: USER.email,
-        password: 'password123',
       });
 
       expect(repo.createUser).toHaveBeenCalledOnce();
@@ -117,38 +118,10 @@ describe('AuthService', () => {
     it('возвращает generic-ответ для существующего email без создания записи', async () => {
       repo.findUserByEmail.mockResolvedValue(USER);
 
-      await service.register({
-        name: USER.name,
-        email: USER.email,
-        password: 'password123',
-      });
+      await service.register({ name: USER.name, email: USER.email });
 
       expect(repo.createUser).not.toHaveBeenCalled();
       expect(mail.sendCodeFireAndForget).not.toHaveBeenCalled();
-    });
-
-    it('не отправляет письмо когда верификация отключена', async () => {
-      module = await Test.createTestingModule({
-        providers: [
-          AuthService,
-          { provide: AuthRepository, useValue: repo },
-          { provide: ConfigService, useValue: makeConfig(false) },
-          { provide: MailService, useValue: mail },
-        ],
-      }).compile();
-      service = module.get(AuthService);
-
-      repo.findUserByEmail.mockResolvedValue(null);
-      repo.createUser.mockResolvedValue({ id: USER.id, email: USER.email });
-
-      const result = await service.register({
-        name: USER.name,
-        email: USER.email,
-        password: 'password123',
-      });
-
-      expect(mail.sendCodeFireAndForget).not.toHaveBeenCalled();
-      expect(result.message).toContain('Теперь можно войти');
     });
   });
 
@@ -212,7 +185,7 @@ describe('AuthService', () => {
       repo.findUserByEmail.mockResolvedValue(null);
 
       await expect(
-        service.verifyEmail('no@example.com', '123456'),
+        service.verifyEmail('no@example.com', '123456', 'password123'),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -224,14 +197,14 @@ describe('AuthService', () => {
         attempts: 0,
       });
 
-      await expect(service.verifyEmail(USER.email, '000000')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.verifyEmail(USER.email, '000000', 'password123'),
+      ).rejects.toThrow(BadRequestException);
 
       expect(repo.incrementCodeAttempts).toHaveBeenCalledWith('code-id');
     });
 
-    it('создаёт сессию при верном коде', async () => {
+    it('устанавливает пароль и создаёт сессию при верном коде', async () => {
       const { codeDigest } = await import('./auth.crypto.js');
       const code = '123456';
       const digest = codeDigest(CODE_KEY, USER.email, 'VERIFY_EMAIL', code);
@@ -243,11 +216,32 @@ describe('AuthService', () => {
         attempts: 0,
       });
 
-      const result = await service.verifyEmail(USER.email, code);
+      const result = await service.verifyEmail(USER.email, code, 'password123');
 
       expect(repo.$transaction).toHaveBeenCalledOnce();
       expect(repo.createSession).toHaveBeenCalledOnce();
       expect(result.user.email).toBe(USER.email);
+    });
+  });
+
+  describe('forgotPassword', () => {
+    it('отправляет код для подтверждённого email', async () => {
+      repo.findUserByEmail.mockResolvedValue(USER);
+
+      const result = await service.forgotPassword(USER.email);
+
+      expect(repo.upsertEmailCode).toHaveBeenCalledOnce();
+      expect(mail.sendCodeFireAndForget).toHaveBeenCalledOnce();
+      expect(result.message).toBeTruthy();
+    });
+
+    it('возвращает generic-ответ для несуществующего email', async () => {
+      repo.findUserByEmail.mockResolvedValue(null);
+
+      const result = await service.forgotPassword('no@example.com');
+
+      expect(repo.upsertEmailCode).not.toHaveBeenCalled();
+      expect(result.message).toBeTruthy();
     });
   });
 

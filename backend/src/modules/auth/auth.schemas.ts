@@ -17,7 +17,6 @@ export const registerSchema = z
   .object({
     name: z.string().trim().min(2, 'Введите имя от 2 до 80 символов').max(80),
     email: normalizedEmail,
-    password,
   })
   .strict();
 
@@ -30,11 +29,19 @@ export const loginSchema = z
   .strict();
 
 export const verifyEmailSchema = z
-  .object({ email: normalizedEmail, code })
+  .object({ email: normalizedEmail, code, password })
   .strict();
 
 export const resendVerificationSchema = z
   .object({ email: normalizedEmail })
+  .strict();
+
+export const forgotPasswordSchema = z
+  .object({ email: normalizedEmail })
+  .strict();
+
+export const resetPasswordSchema = z
+  .object({ email: normalizedEmail, code, newPassword: password })
   .strict();
 
 export function parseInput<T>(schema: z.ZodType<T>, input: unknown): T {

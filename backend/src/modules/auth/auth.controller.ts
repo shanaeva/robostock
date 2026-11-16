@@ -20,10 +20,12 @@ import {
   type AuthenticatedRequest,
 } from './auth.guard.js';
 import {
+  forgotPasswordSchema,
   loginSchema,
   parseInput,
   registerSchema,
   resendVerificationSchema,
+  resetPasswordSchema,
   verifyEmailSchema,
 } from './auth.schemas.js';
 import { ACCESS_TTL_SECONDS, AuthService } from './auth.service.js';
@@ -85,10 +87,15 @@ export class AuthController {
         : createCsrf(this.csrfSecret);
     response.cookie('csrf_token', csrfToken, {
       ...this.cookieOptions(),
-      httpOnly: false, // Must be readable by JS to send as X-CSRF-Token header.
+      httpOnly: false,
       maxAge: 24 * 60 * 60 * 1000,
     });
     return { csrfToken };
+  }
+
+  @Get('settings')
+  settings() {
+    return this.auth.getSettings();
   }
 
   @Post('register')
@@ -98,7 +105,7 @@ export class AuthController {
   }
 
   @Post('resend-verification')
-  @HttpCode(200)
+  @HttpCode(202)
   resendVerification(@Body() body: unknown) {
     const input = parseInput(resendVerificationSchema, body);
     return this.auth.resendVerification(input.email);
@@ -111,7 +118,11 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ) {
     const input = parseInput(verifyEmailSchema, body);
-    const result = await this.auth.verifyEmail(input.email, input.code);
+    const result = await this.auth.verifyEmail(
+      input.email,
+      input.code,
+      input.password,
+    );
     this.setCredentials(response, result, false);
     return { user: result.user };
   }
@@ -164,5 +175,36 @@ export class AuthController {
     );
     this.clearCredentials(response);
     return result;
+  }
+
+  @Post('logout-all')
+  @HttpCode(200)
+  @UseGuards(AuthGuard)
+  async logoutAll(
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.auth.logoutAll(request.auth!.user.id);
+    this.clearCredentials(response);
+    return result;
+  }
+
+  @Post('forgot-password')
+  @HttpCode(202)
+  forgotPassword(@Body() body: unknown) {
+    const input = parseInput(forgotPasswordSchema, body);
+    return this.auth.forgotPassword(input.email);
+  }
+
+  @Post('reset-password')
+  @HttpCode(200)
+  async resetPassword(
+    @Body() body: unknown,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const input = parseInput(resetPasswordSchema, body);
+    const result = await this.auth.resetPassword(input);
+    this.setCredentials(response, result, false);
+    return { user: result.user };
   }
 }
