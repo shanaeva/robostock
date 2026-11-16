@@ -204,7 +204,7 @@ describe('AuthService', () => {
       expect(repo.incrementCodeAttempts).toHaveBeenCalledWith('code-id');
     });
 
-    it('устанавливает пароль и создаёт сессию при верном коде', async () => {
+    it('устанавливает пароль и возвращает сообщение при верном коде', async () => {
       const { codeDigest } = await import('./auth.crypto.js');
       const code = '123456';
       const digest = codeDigest(CODE_KEY, USER.email, 'VERIFY_EMAIL', code);
@@ -219,8 +219,8 @@ describe('AuthService', () => {
       const result = await service.verifyEmail(USER.email, code, 'password123');
 
       expect(repo.$transaction).toHaveBeenCalledOnce();
-      expect(repo.createSession).toHaveBeenCalledOnce();
-      expect(result.user.email).toBe(USER.email);
+      expect(repo.createSession).not.toHaveBeenCalled();
+      expect(result.message).toBeTruthy();
     });
   });
 

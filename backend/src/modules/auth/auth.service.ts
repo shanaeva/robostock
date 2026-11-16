@@ -154,19 +154,7 @@ export class AuthService {
       });
     });
 
-    const refreshToken = randomToken();
-    const session = await this.repository.createSession({
-      userId: user.id,
-      rememberMe: false,
-      expiresAt: new Date(Date.now() + SESSION_TTL_MS.short),
-      tokenDigest: tokenDigest(refreshToken),
-    });
-
-    return this.credentials(
-      { ...user, verifiedAt: new Date() },
-      session.id,
-      refreshToken,
-    );
+    return { message: 'Почта подтверждена. Теперь можно войти.' };
   }
 
   async login(input: { email: string; password: string; rememberMe: boolean }) {
@@ -316,15 +304,9 @@ export class AuthService {
       });
     });
 
-    const refreshToken = randomToken();
-    const session = await this.repository.createSession({
-      userId: user.id,
-      rememberMe: false,
-      expiresAt: new Date(Date.now() + SESSION_TTL_MS.short),
-      tokenDigest: tokenDigest(refreshToken),
-    });
-
-    return this.credentials(user, session.id, refreshToken);
+    return {
+      message: 'Пароль изменён. Все сессии завершены. Войдите с новым паролем.',
+    };
   }
 
   async authenticate(token: string | undefined) {

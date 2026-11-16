@@ -149,13 +149,13 @@ describe('Auth API with PostgreSQL', () => {
   });
 
   describe('POST /auth/verify-email', () => {
-    it('подтверждает email, устанавливает пароль и возвращает сессию', async () => {
+    it('подтверждает email, устанавливает пароль и возвращает сообщение', async () => {
       await register();
       const res = await verifyAndSetPassword();
       expect(res.status).toBe(200);
-      expect(res.body.user.email).toBe(REGISTER_INPUT.email);
-      const cookies = res.headers['set-cookie'] as string[] | undefined;
-      expect(cookies?.some((c) => c.startsWith('access_token='))).toBe(true);
+      expect(res.body.message).toBeTruthy();
+      const cookies = (res.headers['set-cookie'] as string[] | undefined) ?? [];
+      expect(cookies.some((c) => c.startsWith('access_token='))).toBe(false);
     });
 
     it('возвращает 400 при неверном коде', async () => {
@@ -211,8 +211,9 @@ describe('Auth API with PostgreSQL', () => {
 
     it('возвращает данные текущего пользователя с валидным токеном', async () => {
       await register();
-      const verifyRes = await verifyAndSetPassword();
-      const cookies = (verifyRes.headers['set-cookie'] as string[]).join('; ');
+      await verifyAndSetPassword();
+      const loginRes = await login();
+      const cookies = (loginRes.headers['set-cookie'] as string[]).join('; ');
 
       const res = await request(server).get('/auth/me').set('Cookie', cookies);
 
@@ -224,8 +225,9 @@ describe('Auth API with PostgreSQL', () => {
   describe('POST /auth/logout', () => {
     it('выходит из аккаунта и инвалидирует сессию', async () => {
       await register();
-      const verifyRes = await verifyAndSetPassword();
-      const cookies = (verifyRes.headers['set-cookie'] as string[]).join('; ');
+      await verifyAndSetPassword();
+      const loginRes = await login();
+      const cookies = (loginRes.headers['set-cookie'] as string[]).join('; ');
 
       const { cookie: csrfCookie, token } = await getCsrf();
       const logoutRes = await request(server)

@@ -113,18 +113,9 @@ export class AuthController {
 
   @Post('verify-email')
   @HttpCode(200)
-  async verifyEmail(
-    @Body() body: unknown,
-    @Res({ passthrough: true }) response: Response,
-  ) {
+  async verifyEmail(@Body() body: unknown) {
     const input = parseInput(verifyEmailSchema, body);
-    const result = await this.auth.verifyEmail(
-      input.email,
-      input.code,
-      input.password,
-    );
-    this.setCredentials(response, result, false);
-    return { user: result.user };
+    return this.auth.verifyEmail(input.email, input.code, input.password);
   }
 
   @Post('login')
@@ -198,13 +189,8 @@ export class AuthController {
 
   @Post('reset-password')
   @HttpCode(200)
-  async resetPassword(
-    @Body() body: unknown,
-    @Res({ passthrough: true }) response: Response,
-  ) {
+  async resetPassword(@Body() body: unknown) {
     const input = parseInput(resetPasswordSchema, body);
-    const result = await this.auth.resetPassword(input);
-    this.setCredentials(response, result, false);
-    return { user: result.user };
+    return this.auth.resetPassword(input);
   }
 }
