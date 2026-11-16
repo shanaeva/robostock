@@ -1,7 +1,7 @@
-import { Logger, Module, StandardSchemaValidationPipe } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import type { OnApplicationShutdown } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_FILTER, APP_PIPE } from '@nestjs/core';
+import { APP_FILTER } from '@nestjs/core';
 import { HttpExceptionFilter } from './common/http-exception.filter.js';
 import { environmentSchema } from './config/environment.js';
 import { HealthController } from './health.controller.js';
@@ -23,10 +23,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     UsersModule,
   ],
   controllers: [HealthController],
-  providers: [
-    { provide: APP_PIPE, useClass: StandardSchemaValidationPipe },
-    { provide: APP_FILTER, useClass: HttpExceptionFilter },
-  ],
+  providers: [{ provide: APP_FILTER, useClass: HttpExceptionFilter }],
 })
 export class AppModule implements OnApplicationShutdown {
   private readonly logger = new Logger(AppModule.name);
