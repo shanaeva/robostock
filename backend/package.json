@@ -9,7 +9,10 @@
     "pnpm": ">=12.18.0 <13"
   },
   "scripts": {
+    "dc": "docker compose -f ../compose.yaml up -d",
+    "dc:d": "docker compose -f ../compose.yaml down",
     "db:studio": "prisma studio",
+    "be": "nest start --watch",
     "bd": "nest build",
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
