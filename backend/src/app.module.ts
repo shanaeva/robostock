@@ -13,8 +13,10 @@ import { PrismaModule } from './prisma/prisma.module.js';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
-      validationSchema: environmentSchema,
+      // In test, also load .env.test so tests can override dev defaults (e.g. AUTH_EMAIL_ENABLED=false).
+      envFilePath:
+        process.env.NODE_ENV === 'test' ? ['.env.test', '.env'] : '.env',
+      validate: (env) => environmentSchema.parse(env),
     }),
     PrismaModule,
     AuthModule,

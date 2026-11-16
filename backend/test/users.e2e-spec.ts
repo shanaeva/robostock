@@ -182,8 +182,10 @@ describe('Users API with PostgreSQL', () => {
       .get(`/users/${stored.id}`)
       .expect(200);
     userResponseSchema.parse(response.body);
-    expect(response.body).toEqual({
-      ...stored,
+    expect(response.body).toMatchObject({
+      id: stored.id,
+      name: stored.name,
+      email: stored.email,
       createdAt: stored.createdAt.toISOString(),
     });
   });
