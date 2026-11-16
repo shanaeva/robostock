@@ -1,2 +1,9 @@
-export { useLogin, useRegister, useLogout } from './api';
-export { LoginForm, RegisterForm } from './ui';
+export {
+  useLogin,
+  useRegister,
+  useLogout,
+  useVerifyEmail,
+  useResendVerification,
+  useGetMe,
+} from './api';
+export { LoginForm, RegisterForm, VerifyEmailForm } from './ui';
