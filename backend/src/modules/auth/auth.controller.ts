@@ -23,6 +23,7 @@ import {
   loginSchema,
   parseInput,
   registerSchema,
+  resendVerificationSchema,
   verifyEmailSchema,
 } from './auth.schemas.js';
 import { ACCESS_TTL_SECONDS, AuthService } from './auth.service.js';
@@ -96,11 +97,23 @@ export class AuthController {
     return this.auth.register(parseInput(registerSchema, body));
   }
 
+  @Post('resend-verification')
+  @HttpCode(200)
+  resendVerification(@Body() body: unknown) {
+    const input = parseInput(resendVerificationSchema, body);
+    return this.auth.resendVerification(input.email);
+  }
+
   @Post('verify-email')
   @HttpCode(200)
-  verifyEmail(@Body() body: unknown) {
+  async verifyEmail(
+    @Body() body: unknown,
+    @Res({ passthrough: true }) response: Response,
+  ) {
     const input = parseInput(verifyEmailSchema, body);
-    return this.auth.verifyEmail(input.email, input.code, input.password);
+    const result = await this.auth.verifyEmail(input.email, input.code);
+    this.setCredentials(response, result, false);
+    return { user: result.user };
   }
 
   @Post('login')

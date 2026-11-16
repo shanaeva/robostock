@@ -30,7 +30,11 @@ export const loginSchema = z
   .strict();
 
 export const verifyEmailSchema = z
-  .object({ email: normalizedEmail, code, password })
+  .object({ email: normalizedEmail, code })
+  .strict();
+
+export const resendVerificationSchema = z
+  .object({ email: normalizedEmail })
   .strict();
 
 export function parseInput<T>(schema: z.ZodType<T>, input: unknown): T {

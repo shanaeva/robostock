@@ -16,6 +16,7 @@ import {
   tokenDigest,
   verifyPassword,
 } from './auth.crypto.js';
+import { MailService } from '../mail/mail.service.js';
 import { AuthRepository } from './auth.repository.js';
 
 export const ACCESS_TTL_SECONDS = 15 * 60;
@@ -52,6 +53,7 @@ export class AuthService {
   constructor(
     @Inject(AuthRepository) private readonly repository: AuthRepository,
     @Inject(ConfigService) config: ConfigService<Environment>,
+    @Inject(MailService) private readonly mail: MailService,
   ) {
     this.jwtSecret = config.getOrThrow('JWT_SECRET');
     this.codeSecret = config.getOrThrow('AUTH_CODE_SECRET');
@@ -90,7 +92,7 @@ export class AuthService {
         digest,
         expiresAt: new Date(Date.now() + 15 * 60 * 1000),
       });
-      // TODO: send email with code
+      this.mail.sendCodeFireAndForget(input.email, code, 'VERIFY_EMAIL');
     }
 
     return {
@@ -98,6 +100,25 @@ export class AuthService {
         ? 'Аккаунт создан. Проверьте почту для подтверждения.'
         : 'Аккаунт создан. Теперь можно войти.',
     };
+  }
+
+  async resendVerification(email: string) {
+    const user = await this.repository.findUserByEmail(email);
+    // Always return the same message to prevent user enumeration.
+    const ok = {
+      message: 'Если аккаунт существует и не подтверждён, письмо отправлено.',
+    };
+    if (!user || user.verifiedAt || !this.emailEnabled) return ok;
+    const code = generateCode();
+    const digest = codeDigest(this.codeSecret, email, 'VERIFY_EMAIL', code);
+    await this.repository.upsertEmailCode({
+      userId: user.id,
+      purpose: 'VERIFY_EMAIL',
+      digest,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    });
+    this.mail.sendCodeFireAndForget(email, code, 'VERIFY_EMAIL');
+    return ok;
   }
 
   async login(input: { email: string; password: string; rememberMe: boolean }) {
@@ -207,7 +228,7 @@ export class AuthService {
     }
   }
 
-  async verifyEmail(email: string, code: string, password: string) {
+  async verifyEmail(email: string, code: string) {
     const user = await this.repository.findUserByEmail(email);
     if (!user) {
       throw new BadRequestException({
@@ -227,7 +248,6 @@ export class AuthService {
         code: 'INVALID_CODE',
       });
     }
-    const passwordHash = await hashPassword(password);
     await this.repository.$transaction(async (tx) => {
       await tx.emailCode.update({
         where: { id: record.id },
@@ -235,10 +255,19 @@ export class AuthService {
       });
       await tx.user.update({
         where: { id: user.id },
-        data: { passwordHash, verifiedAt: new Date() },
+        data: { verifiedAt: new Date() },
       });
     });
-    return { message: 'Почта подтверждена. Теперь можно войти.' };
+
+    const refreshToken = randomToken();
+    const session = await this.repository.createSession({
+      userId: user.id,
+      rememberMe: false,
+      expiresAt: new Date(Date.now() + SESSION_TTL_MS.short),
+      tokenDigest: tokenDigest(refreshToken),
+    });
+
+    return this.credentials(user, session.id, refreshToken);
   }
 
   private async credentials(
