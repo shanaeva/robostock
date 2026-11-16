@@ -34,14 +34,16 @@ function RoleBadge({ role }: { role: Warehouse['currentUserRole'] }) {
 function WarehouseActions({
   warehouse,
   allowInvitations,
+  demoOwner,
   onAction,
 }: {
   warehouse: Warehouse;
   allowInvitations: boolean;
+  demoOwner: boolean;
   onAction: OpenAction;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1 lg:justify-end">
+    <div className="flex flex-wrap items-center gap-1 lg:flex-nowrap lg:justify-start">
       <Button
         variant="outline"
         size="sm"
@@ -51,7 +53,7 @@ function WarehouseActions({
       >
         Открыть <ArrowUpRight aria-hidden="true" />
       </Button>
-      {warehouse.currentUserRole === 'Owner' && (
+      {(warehouse.currentUserRole === 'Owner' || demoOwner) && (
         <>
           <Button
             variant="ghost"
@@ -62,18 +64,39 @@ function WarehouseActions({
           >
             <Pencil aria-hidden="true" />
           </Button>
-          {allowInvitations && (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={`Пригласить пользователя в склад «${warehouse.name}»`}
-              title="Пригласить пользователя"
-              onClick={(event) =>
-                onAction({ type: 'invite', warehouse }, event)
+          {(allowInvitations || demoOwner) && (
+            <span
+              tabIndex={demoOwner ? 0 : undefined}
+              aria-label={demoOwner ? 'Пригласить пользователя' : undefined}
+              aria-describedby={
+                demoOwner ? 'warehouse-invitations-note' : undefined
               }
+              className="group relative inline-flex rounded-md outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
             >
-              <UserPlus aria-hidden="true" />
-            </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                disabled={demoOwner}
+                aria-describedby={
+                  demoOwner ? 'warehouse-invitations-note' : undefined
+                }
+                aria-label={`Пригласить пользователя в склад «${warehouse.name}»`}
+                title="Пригласить пользователя"
+                onClick={(event) =>
+                  !demoOwner && onAction({ type: 'invite', warehouse }, event)
+                }
+              >
+                <UserPlus aria-hidden="true" />
+              </Button>
+              {demoOwner && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs text-white shadow-lg group-hover:block group-focus:block"
+                >
+                  Скоро
+                </span>
+              )}
+            </span>
           )}
           <Button
             variant="ghost"
@@ -94,10 +117,12 @@ function WarehouseActions({
 export function WarehouseList({
   warehouses,
   allowInvitations,
+  demoOwner = false,
   onAction,
 }: {
   warehouses: Warehouse[];
   allowInvitations: boolean;
+  demoOwner?: boolean;
   onAction: OpenAction;
 }) {
   return (
@@ -107,7 +132,10 @@ export function WarehouseList({
         <thead className="border-y border-slate-200 bg-slate-50 text-xs font-medium text-slate-500">
           <tr>
             <th scope="col" className="px-6 py-3 font-medium">
-              Название склада
+              <div className="grid grid-cols-[2rem_minmax(0,1fr)] items-center gap-3">
+                <span aria-hidden="true" />
+                <span>Название склада</span>
+              </div>
             </th>
             <th scope="col" className="w-36 px-4 py-3 font-medium">
               Размер
@@ -115,7 +143,7 @@ export function WarehouseList({
             <th scope="col" className="w-40 px-4 py-3 font-medium">
               Ваша роль
             </th>
-            <th scope="col" className="w-72 px-6 py-3 text-right font-medium">
+            <th scope="col" className="w-72 px-6 py-3 text-left font-medium">
               Действия
             </th>
           </tr>
@@ -123,9 +151,12 @@ export function WarehouseList({
         <tbody className="divide-y divide-slate-100">
           {warehouses.map((warehouse) => (
             <tr key={warehouse.id} className="hover:bg-slate-50/70">
-              <th scope="row" className="px-6 py-5 font-medium text-slate-900">
-                <div className="flex items-center gap-3">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500">
+              <th
+                scope="row"
+                className="px-6 py-4 align-middle font-medium text-slate-900"
+              >
+                <div className="grid grid-cols-[2rem_minmax(0,1fr)] items-center gap-3">
+                  <span className="flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500">
                     <WarehouseIcon className="size-4" aria-hidden="true" />
                   </span>
                   <span className="min-w-0 [overflow-wrap:anywhere]">
@@ -133,16 +164,17 @@ export function WarehouseList({
                   </span>
                 </div>
               </th>
-              <td className="px-4 py-5 text-sm tabular-nums text-slate-600 [overflow-wrap:anywhere]">
+              <td className="px-4 py-4 align-middle text-sm tabular-nums text-slate-600 [overflow-wrap:anywhere]">
                 {warehouse.width} × {warehouse.height} клеток
               </td>
-              <td className="px-4 py-5">
+              <td className="px-4 py-4 align-middle">
                 <RoleBadge role={warehouse.currentUserRole} />
               </td>
-              <td className="px-6 py-5">
+              <td className="px-6 py-4 align-middle">
                 <WarehouseActions
                   warehouse={warehouse}
                   allowInvitations={allowInvitations}
+                  demoOwner={demoOwner}
                   onAction={onAction}
                 />
               </td>
@@ -174,6 +206,7 @@ export function WarehouseList({
             <WarehouseActions
               warehouse={warehouse}
               allowInvitations={allowInvitations}
+              demoOwner={demoOwner}
               onAction={onAction}
             />
           </li>

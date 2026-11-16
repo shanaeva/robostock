@@ -73,9 +73,9 @@ export function createWarehouseMockApi(
           typeof a === 'number' && typeof b === 'number'
             ? a - b
             : String(a).localeCompare(String(b), 'ru');
-        const stable = comparison || left.id.localeCompare(right.id);
+        const directed = params.sortOrder === 'asc' ? comparison : -comparison;
 
-        return params.sortOrder === 'asc' ? stable : -stable;
+        return directed || left.id.localeCompare(right.id);
       });
       const start = (params.page - 1) * params.limit;
 

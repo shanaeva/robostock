@@ -19,6 +19,7 @@ import {
 } from '../api/types';
 import { useWarehouses } from '../api/queries';
 import type { WarehouseAction } from '../model/use-warehouse-command';
+import { isWarehouseDemoOwner } from '../model/demo-owner';
 import { WarehouseActionDialog } from './warehouse-action-dialog';
 import { Button } from '@/shared/ui/button';
 import { WarehouseList } from './warehouse-list';
@@ -34,10 +35,12 @@ export function WarehousesContent({ api }: { api: WarehouseDataSource }) {
   const query = useWarehouses(api, params);
   const [action, setAction] = useState<WarehouseAction | null>(null);
   const [notice, setNotice] = useState('');
+  const [announceOnly, setAnnounceOnly] = useState(false);
   const actionTrigger = useRef<HTMLButtonElement | null>(null);
   const createButton = useRef<HTMLButtonElement | null>(null);
   const warehouses = query.data?.list ?? [];
   const hasFilters = Boolean(params.search.trim() || params.role);
+  const demoOwner = isWarehouseDemoOwner(api.mode);
 
   function openAction(
     nextAction: WarehouseAction,
@@ -59,6 +62,7 @@ export function WarehousesContent({ api }: { api: WarehouseDataSource }) {
 
   function onMutationSuccess(message: string) {
     setNotice(message);
+    setAnnounceOnly(action?.type === 'create' || action?.type === 'rename');
     setParams((previous) => ({ ...previous, page: 1 }));
   }
 
@@ -78,6 +82,22 @@ export function WarehousesContent({ api }: { api: WarehouseDataSource }) {
           <span className="ml-4 hidden border-l border-slate-200 pl-5 text-sm text-slate-500 sm:inline">
             Управление складами
           </span>
+          {demoOwner && (
+            <span
+              tabIndex={0}
+              aria-describedby="warehouse-test-mode-note"
+              className="group relative ml-auto shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+            >
+              Тестовый режим
+              <span
+                id="warehouse-test-mode-note"
+                role="tooltip"
+                className="pointer-events-none absolute right-0 top-full z-20 mt-2 hidden w-52 rounded-md bg-slate-900 px-3 py-2 text-left text-xs font-normal leading-5 text-white shadow-lg group-hover:block group-focus:block"
+              >
+                Реальные права пока не подключены
+              </span>
+            </span>
+          )}
         </div>
       </header>
 
@@ -100,14 +120,24 @@ export function WarehousesContent({ api }: { api: WarehouseDataSource }) {
           </Button>
         </div>
 
-        <p className="flex items-start gap-2 text-xs leading-5 text-slate-500">
-          <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          {api.mode === 'mock'
-            ? 'Демо-данные: изменения сбросятся после перезагрузки'
-            : 'Сведения о правах пока недоступны. Изменение, удаление и приглашения отключены.'}
-        </p>
+        {!demoOwner && (
+          <p className="flex items-start gap-2 text-xs leading-5 text-slate-500">
+            <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            {api.mode === 'mock'
+              ? 'Демо-данные: изменения сбросятся после перезагрузки'
+              : 'Сведения о правах пока недоступны. Изменение, удаление и приглашения отключены.'}
+          </p>
+        )}
+        {demoOwner && (
+          <span id="warehouse-invitations-note" className="sr-only">
+            Скоро
+          </span>
+        )}
 
-        {notice && (
+        <p role="status" aria-atomic="true" className="sr-only">
+          {announceOnly ? notice : ''}
+        </p>
+        {notice && !announceOnly && (
           <div
             role="status"
             className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900"
@@ -200,6 +230,7 @@ export function WarehousesContent({ api }: { api: WarehouseDataSource }) {
             <WarehouseList
               warehouses={warehouses}
               allowInvitations={Boolean(api.invite)}
+              demoOwner={demoOwner}
               onAction={openAction}
             />
           )}

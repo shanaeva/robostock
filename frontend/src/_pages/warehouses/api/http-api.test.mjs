@@ -3,6 +3,7 @@ import { createWarehouseDataSource } from './data-source';
 import { createWarehouseHttpApi } from './http-api';
 import { defaultWarehouseListParams } from './types';
 import { warehousesMock } from './mock-data';
+import { warehouseCreateSchema } from '../model/schemas';
 import {
   WarehouseApiError,
   getHttpErrorMessage,
@@ -31,6 +32,30 @@ afterEach(() => {
 });
 
 describe('warehouse contract fixtures and errors', () => {
+  it.each([
+    [1, true],
+    [500, true],
+    [0, false],
+    [501, false],
+    [1.5, false],
+  ])('validates creation dimensions %s (valid: %s)', async (value, valid) => {
+    vi.useFakeTimers();
+    const source = createWarehouseDataSource({ demoScenario: 'empty' });
+    for (const field of ['width', 'height']) {
+      const input = { name: 'Boundary', width: 20, height: 20, [field]: value };
+      expect(warehouseCreateSchema.safeParse(input).success).toBe(valid);
+      const result = source.create(input);
+      const assertion = valid
+        ? expect(result).resolves.toHaveProperty('warehouseId')
+        : expect(result).rejects.toMatchObject({ status: 400 });
+      await vi.runAllTimersAsync();
+      await assertion;
+    }
+    const list = source.list(defaultWarehouseListParams);
+    await vi.runAllTimersAsync();
+    expect((await list).total).toBe(valid ? 2 : 0);
+  });
+
   it('validates every initial mock warehouse and keeps IDs unique', () => {
     for (const warehouse of warehousesMock) {
       expect(warehouseSummarySchema.safeParse(warehouse).success).toBe(true);
@@ -235,6 +260,47 @@ describe('HTTP warehouse operations (OpenAPI 0.3.0-draft)', () => {
 });
 
 describe('explicit data-source selection', () => {
+  it.each(['name', 'width', 'height'])(
+    'uses ID ASC to break %s ties in either primary direction',
+    async (sortBy) => {
+      vi.useFakeTimers();
+      const source = createWarehouseDataSource({ demoScenario: 'empty' });
+      const ids = [];
+      for (let index = 0; index < 4; index++) {
+        const higher = index === 3;
+        const created = source.create({
+          name: higher ? 'Z' : 'A',
+          width: higher ? 40 : 20,
+          height: higher ? 40 : 20,
+        });
+        await vi.runAllTimersAsync();
+        ids.push((await created).warehouseId);
+      }
+      const tiedIds = ids.slice(0, 3).sort((a, b) => a.localeCompare(b));
+      for (const sortOrder of ['asc', 'desc']) {
+        const list = source.list({
+          ...defaultWarehouseListParams,
+          sortBy,
+          sortOrder,
+        });
+        await vi.runAllTimersAsync();
+        expect((await list).list.map(({ id }) => id)).toEqual(
+          sortOrder === 'asc' ? [...tiedIds, ids[3]] : [ids[3], ...tiedIds],
+        );
+        const byId = source.list({
+          ...defaultWarehouseListParams,
+          sortBy: 'id',
+          sortOrder,
+        });
+        await vi.runAllTimersAsync();
+        const sortedIds = [...ids].sort((a, b) => a.localeCompare(b));
+        expect((await byId).list.map(({ id }) => id)).toEqual(
+          sortOrder === 'asc' ? sortedIds : sortedIds.reverse(),
+        );
+      }
+    },
+  );
+
   it('keeps HTTP errors, without falling back to mock data or enabling demo invitations', async () => {
     const fetchMock = mockFetch(new Response(null, { status: 503 }));
     const source = createWarehouseDataSource({

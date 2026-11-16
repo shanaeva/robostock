@@ -77,6 +77,7 @@ export function WarehouseCreateForm({ onSubmit, onCancel }: Props) {
               type="number"
               inputMode="numeric"
               min={1}
+              max={500}
               step={1}
               aria-invalid={Boolean(errors[field.name])}
               aria-describedby={

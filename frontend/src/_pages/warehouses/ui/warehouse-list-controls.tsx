@@ -81,7 +81,6 @@ export function WarehouseListControls({
             }
           >
             <option value="name">Названию</option>
-            <option value="id">Идентификатору</option>
             <option value="width">Ширине</option>
             <option value="height">Высоте</option>
           </select>
