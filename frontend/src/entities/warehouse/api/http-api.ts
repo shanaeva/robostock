@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import { createHttpClient, HttpClientConfigurationError } from '@/shared/api';
 import {
   warehouseListSchema,
   warehouseCreatedSchema,
@@ -8,48 +9,30 @@ import { WarehouseApiError, getHttpErrorMessage } from './errors';
 import type { WarehouseDataSource } from './types';
 
 export function createWarehouseHttpApi(baseUrl?: string): WarehouseDataSource {
+  const client = createHttpClient(baseUrl);
   // Resolve lazily so a missing setting appears in the existing error UI,
   // rather than crashing Next.js prerendering or silently selecting mocks.
   function endpoint(relativePath: string) {
-    let base: URL;
     try {
-      base = new URL(baseUrl?.trim() ?? '');
-    } catch {
-      throw new WarehouseApiError(
-        null,
-        'Для HTTP-режима задайте NEXT_PUBLIC_API_BASE_URL — адрес API.',
-      );
-    }
+      return client.url(relativePath);
+    } catch (error) {
+      if (error instanceof HttpClientConfigurationError) {
+        throw new WarehouseApiError(
+          null,
+          error.reason === 'missing-base-url'
+            ? 'Для HTTP-режима задайте NEXT_PUBLIC_API_BASE_URL — адрес API.'
+            : 'Адрес API должен быть HTTP(S) URL без логина, пароля, query и hash.',
+        );
+      }
 
-    if (
-      !['http:', 'https:'].includes(base.protocol) ||
-      base.search ||
-      base.hash ||
-      base.username ||
-      base.password
-    ) {
-      throw new WarehouseApiError(
-        null,
-        'Адрес API должен быть HTTP(S) URL без логина, пароля, query и hash.',
-      );
+      throw error;
     }
-    base.pathname = base.pathname.replace(/\/?$/, '/');
-
-    return new URL(relativePath, base);
   }
 
   async function request(url: URL, init: RequestInit = {}) {
     let response: Response;
     try {
-      response = await fetch(url, {
-        ...init,
-        credentials: 'include',
-        cache: 'no-store',
-        headers: {
-          Accept: 'application/json',
-          ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-        },
-      });
+      response = await client.request(url, init);
     } catch (error) {
       if (init.signal?.aborted) {
         throw error;

@@ -6,8 +6,8 @@ import {
   UserPlus,
   Warehouse as WarehouseIcon,
 } from 'lucide-react';
-import { warehouseRoleLabels, type Warehouse } from '../model/types';
-import type { WarehouseAction } from '../model/use-warehouse-command';
+import { warehouseRoleLabels, type Warehouse } from '@/entities/warehouse';
+import type { WarehouseAction } from '@/features/manage-warehouse';
 import { Button } from '@/shared/ui/button';
 import { cn } from '@/shared/lib/utils';
 

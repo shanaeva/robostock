@@ -1,7 +1,9 @@
 'use client';
 
-import type { WarehouseDataSource } from '../api/types';
-import { getWarehouseErrorMessage } from '../api/errors';
+import {
+  getWarehouseErrorMessage,
+  type WarehouseDataSource,
+} from '@/entities/warehouse';
 import { Button } from '@/shared/ui/button';
 import {
   Dialog,

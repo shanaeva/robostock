@@ -1,16 +1,16 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { getWarehouseErrorMessage } from '../api/errors';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { DialogFooter } from '@/shared/ui/dialog';
 import {
+  getWarehouseErrorMessage,
   warehouseCreateSchema,
-  type WarehouseCreateValues,
-} from '../model/schemas';
+  type WarehouseCreateInput,
+} from '@/entities/warehouse';
 
 type Props = {
-  onSubmit: (values: WarehouseCreateValues) => Promise<void>;
+  onSubmit: (values: WarehouseCreateInput) => Promise<void>;
   onCancel: () => void;
 };
 
@@ -25,7 +25,7 @@ export function WarehouseCreateForm({ onSubmit, onCancel }: Props) {
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
-  } = useForm<WarehouseCreateValues>({
+  } = useForm<WarehouseCreateInput>({
     resolver: zodResolver(warehouseCreateSchema),
     defaultValues: { name: '', width: 20, height: 20 },
   });

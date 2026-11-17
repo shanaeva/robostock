@@ -1,17 +1,17 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { getWarehouseErrorMessage } from '../api/errors';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { DialogFooter } from '@/shared/ui/dialog';
 import {
+  getWarehouseErrorMessage,
   warehouseNameSchema,
-  type WarehouseNameValues,
-} from '../model/schemas';
+  type WarehouseRenameInput,
+} from '@/entities/warehouse';
 
 type Props = {
   initialName: string;
-  onSubmit: (values: WarehouseNameValues) => Promise<void>;
+  onSubmit: (values: WarehouseRenameInput) => Promise<void>;
   onCancel: () => void;
 };
 
@@ -21,7 +21,7 @@ export function WarehouseNameForm({ initialName, onSubmit, onCancel }: Props) {
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
-  } = useForm<WarehouseNameValues>({
+  } = useForm<WarehouseRenameInput>({
     resolver: zodResolver(warehouseNameSchema),
     defaultValues: { name: initialName },
   });

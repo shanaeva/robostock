@@ -1,6 +1,6 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { getWarehouseErrorMessage } from '../api/errors';
+import { getWarehouseErrorMessage } from '@/entities/warehouse';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { DialogFooter } from '@/shared/ui/dialog';

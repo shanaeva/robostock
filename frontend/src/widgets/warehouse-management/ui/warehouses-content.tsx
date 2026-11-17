@@ -11,16 +11,18 @@ import {
   Warehouse as WarehouseIcon,
   X,
 } from 'lucide-react';
-import { getWarehouseErrorMessage } from '../api/errors';
 import {
+  getWarehouseErrorMessage,
   defaultWarehouseListParams,
+  useWarehouses,
   type WarehouseDataSource,
   type WarehouseListParams,
-} from '../api/types';
-import { useWarehouses } from '../api/queries';
-import type { WarehouseAction } from '../model/use-warehouse-command';
+} from '@/entities/warehouse';
 import { isWarehouseDemoOwner } from '../model/demo-owner';
-import { WarehouseActionDialog } from './warehouse-action-dialog';
+import {
+  WarehouseActionDialog,
+  type WarehouseAction,
+} from '@/features/manage-warehouse';
 import { Button } from '@/shared/ui/button';
 import { WarehouseList } from './warehouse-list';
 import {

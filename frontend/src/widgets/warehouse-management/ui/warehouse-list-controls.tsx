@@ -1,8 +1,10 @@
 import { Search } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
-import type { WarehouseListParams } from '../api/types';
-import type { WarehouseListResult } from '../model/types';
+import type {
+  WarehouseListParams,
+  WarehouseListResult,
+} from '@/entities/warehouse';
 
 const roleFilters = [
   { value: 'all', label: 'Все' },

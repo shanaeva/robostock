@@ -1,6 +1,6 @@
 import type {
-  WarehouseCreateValues,
-  WarehouseNameValues,
+  WarehouseCreateInput,
+  WarehouseRenameInput,
 } from '../model/schemas';
 import type { WarehouseListResult, WarehouseRole } from '../model/types';
 
@@ -31,8 +31,8 @@ export interface WarehouseDataSource {
     params: WarehouseListParams,
     signal?: AbortSignal,
   ): Promise<WarehouseListResult>;
-  create(input: WarehouseCreateValues): Promise<{ warehouseId: string }>;
-  rename(id: string, input: WarehouseNameValues): Promise<void>;
+  create(input: WarehouseCreateInput): Promise<{ warehouseId: string }>;
+  rename(id: string, input: WarehouseRenameInput): Promise<void>;
   remove(id: string): Promise<void>;
   // Only mocks implement invitations: there is no invitation endpoint in the draft.
   invite?: (

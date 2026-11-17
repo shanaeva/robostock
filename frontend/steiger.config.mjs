@@ -9,4 +9,10 @@ export default defineConfig([
       'fsd/typo-in-layer-name': 'off',
     },
   },
+  {
+    rules: {
+      // Single-consumer slices are allowed by our thin-page convention.
+      'fsd/insignificant-slice': 'warn',
+    },
+  },
 ]);

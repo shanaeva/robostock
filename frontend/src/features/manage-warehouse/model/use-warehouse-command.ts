@@ -1,12 +1,14 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { warehousesQueryKey } from '../api/queries';
-import type { WarehouseDataSource } from '../api/types';
-import { WarehouseApiError } from '../api/errors';
-import type { Warehouse } from './types';
-import type { WarehouseCreateValues } from './schemas';
+import {
+  warehousesQueryKey,
+  WarehouseApiError,
+  type WarehouseDataSource,
+  type Warehouse,
+  type WarehouseCreateInput,
+} from '@/entities/warehouse';
 
 export type WarehouseCommand =
-  | ({ type: 'create' } & WarehouseCreateValues)
+  | ({ type: 'create' } & WarehouseCreateInput)
   | { type: 'rename'; id: string; name: string }
   | { type: 'delete'; id: string }
   | { type: 'invite'; id: string; email: string };

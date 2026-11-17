@@ -4,8 +4,8 @@ import { WarehouseApiError } from './errors';
 import {
   warehouseCreateSchema,
   warehouseNameSchema,
-  type WarehouseCreateValues,
-  type WarehouseNameValues,
+  type WarehouseCreateInput,
+  type WarehouseRenameInput,
 } from '../model/schemas';
 import { warehousesMock } from './mock-data';
 
@@ -89,7 +89,7 @@ export function createWarehouseMockApi(
       };
     },
     async create(
-      input: WarehouseCreateValues,
+      input: WarehouseCreateInput,
     ): Promise<{ warehouseId: string }> {
       await wait();
       checkMutation();
@@ -109,7 +109,7 @@ export function createWarehouseMockApi(
 
       return { warehouseId };
     },
-    async rename(id: string, input: WarehouseNameValues): Promise<void> {
+    async rename(id: string, input: WarehouseRenameInput): Promise<void> {
       await wait();
       const warehouse = requireOwner(id);
       checkMutation();

@@ -19,14 +19,5 @@ export const warehouseCreateSchema = warehouseNameSchema.extend({
   height: warehouseDimensionSchema,
 });
 
-export const warehouseInviteSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, 'Введите email')
-    .pipe(z.email('Введите корректный email')),
-});
-
-export type WarehouseNameValues = z.infer<typeof warehouseNameSchema>;
-export type WarehouseCreateValues = z.infer<typeof warehouseCreateSchema>;
-export type WarehouseInviteValues = z.infer<typeof warehouseInviteSchema>;
+export type WarehouseCreateInput = z.infer<typeof warehouseCreateSchema>;
+export type WarehouseRenameInput = z.infer<typeof warehouseNameSchema>;

@@ -29,15 +29,38 @@ a rebuild. `NEXT_PUBLIC_*` variables are public; do not store secrets in them.
   enables renaming and deletion but does not change server-side permissions
   and is ignored in production. HTTP invitations are disabled.
 
+## Structure
+
+The page composes `WarehouseManagement` through its public API. Implementation
+is split into FSD slices:
+
+- `widgets/warehouse-management` — screen composition, filters, pagination,
+  action selection, notices, and a local QueryClient and data-source instance.
+- `features/manage-warehouse` — action dialog, forms, invitation validation,
+  mutations, and list invalidation after successful commands.
+- `entities/warehouse` — warehouse types, input and response schemas, query
+  keys, list queries, and HTTP/mock adapters. It does not depend on form types.
+- `shared/api` — HTTP URL validation and transport; warehouse contracts and
+  user-facing error messages remain in `entities/warehouse`.
+
+Each slice exposes an `index.ts`; imports between layers use these public APIs.
+The cache and mock data retain their lifetime per mounted screen.
+
+The widget and feature currently have one consuming slice each. Under the
+thin-page convention, `fsd/insignificant-slice` is advisory (`warn`), so it still
+reports candidates for merging without blocking this separation. Import
+boundaries and public API checks remain errors.
+
 ## Checks
 
 Run from the repository root:
 
 ```sh
 pnpm --filter @starter/backend exec vitest run --root ../frontend
-pnpm exec prettier --check frontend/src/_pages/warehouses
+pnpm exec prettier --check frontend/src frontend/vitest.config.mjs
 pnpm --filter frontend lint
 pnpm --filter frontend fsd:check
+pnpm --filter frontend exec next typegen
 pnpm --filter frontend exec tsc --noEmit --incremental false
 pnpm --filter frontend build
 ```
