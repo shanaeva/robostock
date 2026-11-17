@@ -30,14 +30,21 @@ export function createHttpClient(baseUrl?: string) {
   }
 
   function request(url: URL, init: RequestInit = {}) {
+    const headers = new Headers(init.headers);
+
+    if (!headers.has('Accept')) {
+      headers.set('Accept', 'application/json');
+    }
+
+    if (typeof init.body === 'string' && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+
     return fetch(url, {
       ...init,
       credentials: 'include',
       cache: 'no-store',
-      headers: {
-        Accept: 'application/json',
-        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-      },
+      headers,
     });
   }
 
