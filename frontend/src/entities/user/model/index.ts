@@ -1,2 +1,1 @@
-export { useUserStore } from './store';
-export type { CurrentUser } from './store';
+export type { CurrentUser, UserRole } from './types';

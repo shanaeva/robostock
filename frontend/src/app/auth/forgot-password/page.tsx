@@ -1,16 +1,11 @@
-import { ForgotPasswordForm } from '@/features/auth';
+import { ForgotPasswordPage } from '@/_pages/auth';
 
-export default async function ForgotPasswordPage({
+export default async function ForgotPasswordRoute({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { email: emailParam } = await searchParams;
-  const email = typeof emailParam === 'string' ? emailParam : undefined;
+  const { email } = await searchParams;
 
-  return (
-    <main className="flex flex-1 items-center justify-center px-4">
-      <ForgotPasswordForm defaultEmail={email} />
-    </main>
-  );
+  return <ForgotPasswordPage defaultEmail={typeof email === 'string' ? email : undefined} />;
 }

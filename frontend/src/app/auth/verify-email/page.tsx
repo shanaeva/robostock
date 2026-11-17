@@ -1,17 +1,16 @@
-import { VerifyEmailForm } from '@/features/auth';
+import { VerifyEmailPage } from '@/_pages/auth';
 
-export default async function VerifyEmailPage({
+export default async function VerifyEmailRoute({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { email: emailParam, name: nameParam } = await searchParams;
-  const email = typeof emailParam === 'string' ? emailParam : '';
-  const name = typeof nameParam === 'string' ? nameParam : '';
+  const { email, name } = await searchParams;
 
   return (
-    <main className="flex flex-1 items-center justify-center px-4">
-      <VerifyEmailForm email={email} name={name} />
-    </main>
+    <VerifyEmailPage
+      email={typeof email === 'string' ? email : ''}
+      name={typeof name === 'string' ? name : ''}
+    />
   );
 }

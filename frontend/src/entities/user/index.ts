@@ -1,2 +1,2 @@
-export { useUserStore } from './model';
-export type { CurrentUser } from './model';
+export type { CurrentUser, UserRole } from './model';
+export { useGetMe } from './api';

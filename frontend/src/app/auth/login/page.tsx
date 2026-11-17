@@ -1,16 +1,11 @@
-import { LoginForm } from '@/features/auth';
+import { LoginPage } from '@/_pages/auth';
 
-export default async function LoginPage({
+export default async function LoginRoute({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { email: emailParam } = await searchParams;
-  const email = typeof emailParam === 'string' ? emailParam : undefined;
+  const { email } = await searchParams;
 
-  return (
-    <main className="flex flex-1 items-center justify-center px-4">
-      <LoginForm defaultEmail={email} />
-    </main>
-  );
+  return <LoginPage defaultEmail={typeof email === 'string' ? email : undefined} />;
 }

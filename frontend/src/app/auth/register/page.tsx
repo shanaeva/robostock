@@ -1,17 +1,16 @@
-import { RegisterForm } from '@/features/auth';
+import { RegisterPage } from '@/_pages/auth';
 
-export default async function RegisterPage({
+export default async function RegisterRoute({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { email: emailParam, name: nameParam } = await searchParams;
-  const email = typeof emailParam === 'string' ? emailParam : undefined;
-  const name = typeof nameParam === 'string' ? nameParam : undefined;
+  const { email, name } = await searchParams;
 
   return (
-    <main className="flex flex-1 items-center justify-center px-4">
-      <RegisterForm defaultEmail={email} defaultName={name} />
-    </main>
+    <RegisterPage
+      defaultEmail={typeof email === 'string' ? email : undefined}
+      defaultName={typeof name === 'string' ? name : undefined}
+    />
   );
 }

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { ApiError } from '@/shared/api';
-import { useRegister } from '../api';
+import { useRegister } from '../model';
 
 interface FormValues {
   name: string;

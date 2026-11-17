@@ -2,10 +2,11 @@ export {
   useLogin,
   useRegister,
   useLogout,
-  useVerifyEmail,
-  useResendVerification,
-  useGetMe,
+} from './model';
+export {
   useGetSettings,
+  useResendVerification,
+  useVerifyEmail,
   useForgotPassword,
   useResetPassword,
 } from './api';

@@ -1,6 +1,6 @@
 import { getCsrfToken, invalidateCsrf } from './csrf';
 
-export const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
+export const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -59,11 +59,7 @@ async function tryRefresh(): Promise<boolean> {
       return true;
     }
 
-    const refreshRes = await fetch(`${API}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const refreshRes = await execute('/auth/refresh', { method: 'POST' }, true);
 
     if (refreshRes.ok) {
       invalidateCsrf();
@@ -94,8 +90,9 @@ export async function apiFetch<T>(
   let res = await execute(path, init, needsCsrf);
 
   // On 401 try to refresh once, then retry the original request.
-  // Skip for auth endpoints themselves to avoid infinite loops.
-  if (res.status === 401 && !path.startsWith('/auth/')) {
+  // Skip only endpoints that would cause an infinite loop if retried.
+  const noRefresh = ['/auth/refresh', '/auth/login', '/auth/logout', '/auth/logout-all'];
+  if (res.status === 401 && !noRefresh.includes(path)) {
     refreshing ??= tryRefresh().finally(() => {
       refreshing = null;
     });

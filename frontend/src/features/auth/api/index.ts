@@ -1,11 +1,7 @@
 export {
-  useLogin,
-  useRegister,
-  useLogout,
-  useVerifyEmail,
-  useResendVerification,
-  useGetMe,
   useGetSettings,
+  useResendVerification,
+  useVerifyEmail,
   useForgotPassword,
   useResetPassword,
 } from './auth';

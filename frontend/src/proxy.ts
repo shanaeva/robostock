@@ -15,7 +15,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = request.cookies.get('access_token');
+  const token = request.cookies.get('refresh_token');
 
   if (!token) {
     const loginUrl = new URL('/auth/login', request.url);

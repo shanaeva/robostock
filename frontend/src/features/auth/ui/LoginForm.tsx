@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { ApiError } from '@/shared/api';
-import { useLogin } from '../api';
+import { useLogin } from '../model';
 
 interface FormValues {
   email: string;
