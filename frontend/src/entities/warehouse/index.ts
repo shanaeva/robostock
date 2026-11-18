@@ -22,3 +22,9 @@ export type {
   WarehouseRole,
   WarehouseListResult,
 } from './model/types';
+export {
+  WAREHOUSE_NAME_MIN_LENGTH,
+  WAREHOUSE_NAME_MAX_LENGTH,
+  WAREHOUSE_DIMENSION_MIN,
+  WAREHOUSE_DIMENSION_MAX,
+} from './model/constants';

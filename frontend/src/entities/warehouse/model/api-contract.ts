@@ -1,11 +1,18 @@
 import { z } from 'zod';
+import {
+  WAREHOUSE_NAME_MIN_LENGTH,
+  WAREHOUSE_NAME_MAX_LENGTH,
+} from './constants';
 
 const positiveInteger = z.number().min(1).refine(Number.isInteger);
 
 // WarehouseSummary / WarehouseList from OpenAPI 0.3.0-draft. No role field.
 export const warehouseSummarySchema = z.object({
   id: z.uuid(),
-  name: z.string().min(1).max(100),
+  name: z
+    .string()
+    .min(WAREHOUSE_NAME_MIN_LENGTH)
+    .max(WAREHOUSE_NAME_MAX_LENGTH),
   width: positiveInteger,
   height: positiveInteger,
 });

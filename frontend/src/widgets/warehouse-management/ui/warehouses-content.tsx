@@ -25,10 +25,8 @@ import {
 } from '@/features/manage-warehouse';
 import { Button } from '@/shared/ui/button';
 import { WarehouseList } from './warehouse-list';
-import {
-  WarehouseListControls,
-  WarehousePagination,
-} from './warehouse-list-controls';
+import { WarehouseListControls } from './warehouse-list-controls';
+import { WarehousePagination } from './warehouse-pagination';
 
 export function WarehousesContent({ api }: { api: WarehouseDataSource }) {
   const [params, setParams] = useState<WarehouseListParams>({
@@ -66,6 +64,84 @@ export function WarehousesContent({ api }: { api: WarehouseDataSource }) {
     setNotice(message);
     setAnnounceOnly(action?.type === 'create' || action?.type === 'rename');
     setParams((previous) => ({ ...previous, page: 1 }));
+  }
+
+  function renderListContent() {
+    if (query.isPending) {
+      return (
+        <div
+          role="status"
+          className="flex min-h-64 items-center justify-center gap-3 border-t border-slate-200 text-sm text-slate-500"
+        >
+          <LoaderCircle
+            className="size-5 animate-spin motion-reduce:animate-none"
+            aria-hidden="true"
+          />{' '}
+          Загружаем склады…
+        </div>
+      );
+    }
+
+    if (query.isError) {
+      return (
+        <div
+          role="alert"
+          className="flex min-h-64 flex-col items-center justify-center gap-4 border-t border-slate-200 p-6 text-center"
+        >
+          <AlertCircle className="size-7 text-red-600" aria-hidden="true" />
+          <p className="text-sm text-slate-600">
+            {getWarehouseErrorMessage(query.error)}
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              void query.refetch();
+            }}
+          >
+            <RotateCcw aria-hidden="true" /> Повторить
+          </Button>
+        </div>
+      );
+    }
+
+    if (query.data.total === 0 && !hasFilters) {
+      return (
+        <div className="flex min-h-72 flex-col items-center justify-center gap-3 border-t border-slate-200 p-6 text-center">
+          <WarehouseIcon
+            className="mb-1 size-8 text-slate-400"
+            aria-hidden="true"
+          />
+          <h2 className="font-semibold">У вас пока нет складов</h2>
+          <p className="max-w-xs text-sm leading-6 text-slate-500">
+            Создайте первый склад.
+          </p>
+        </div>
+      );
+    }
+
+    if (warehouses.length === 0) {
+      return (
+        <div className="flex min-h-64 flex-col items-center justify-center gap-3 border-t border-slate-200 p-6 text-center">
+          <Search className="mb-1 size-7 text-slate-400" aria-hidden="true" />
+          <h2 className="font-semibold">Ничего не найдено</h2>
+          <p className="text-sm text-slate-500">
+            Измените условия поиска или вернитесь на первую страницу.
+          </p>
+          <Button variant="outline" onClick={resetFilters}>
+            Сбросить фильтры
+          </Button>
+        </div>
+      );
+    }
+
+    return (
+      <WarehouseList
+        warehouses={warehouses}
+        allowInvitations={Boolean(api.invite)}
+        demoOwner={demoOwner}
+        onAction={openAction}
+      />
+    );
   }
 
   return (
@@ -174,68 +250,7 @@ export function WarehousesContent({ api }: { api: WarehouseDataSource }) {
             }
           />
 
-          {query.isPending ? (
-            <div
-              role="status"
-              className="flex min-h-64 items-center justify-center gap-3 border-t border-slate-200 text-sm text-slate-500"
-            >
-              <LoaderCircle
-                className="size-5 animate-spin motion-reduce:animate-none"
-                aria-hidden="true"
-              />{' '}
-              Загружаем склады…
-            </div>
-          ) : query.isError ? (
-            <div
-              role="alert"
-              className="flex min-h-64 flex-col items-center justify-center gap-4 border-t border-slate-200 p-6 text-center"
-            >
-              <AlertCircle className="size-7 text-red-600" aria-hidden="true" />
-              <p className="text-sm text-slate-600">
-                {getWarehouseErrorMessage(query.error)}
-              </p>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  void query.refetch();
-                }}
-              >
-                <RotateCcw aria-hidden="true" /> Повторить
-              </Button>
-            </div>
-          ) : query.data.total === 0 && !hasFilters ? (
-            <div className="flex min-h-72 flex-col items-center justify-center gap-3 border-t border-slate-200 p-6 text-center">
-              <WarehouseIcon
-                className="mb-1 size-8 text-slate-400"
-                aria-hidden="true"
-              />
-              <h2 className="font-semibold">У вас пока нет складов</h2>
-              <p className="max-w-xs text-sm leading-6 text-slate-500">
-                Создайте первый склад.
-              </p>
-            </div>
-          ) : warehouses.length === 0 ? (
-            <div className="flex min-h-64 flex-col items-center justify-center gap-3 border-t border-slate-200 p-6 text-center">
-              <Search
-                className="mb-1 size-7 text-slate-400"
-                aria-hidden="true"
-              />
-              <h2 className="font-semibold">Ничего не найдено</h2>
-              <p className="text-sm text-slate-500">
-                Измените условия поиска или вернитесь на первую страницу.
-              </p>
-              <Button variant="outline" onClick={resetFilters}>
-                Сбросить фильтры
-              </Button>
-            </div>
-          ) : (
-            <WarehouseList
-              warehouses={warehouses}
-              allowInvitations={Boolean(api.invite)}
-              demoOwner={demoOwner}
-              onAction={openAction}
-            />
-          )}
+          {renderListContent()}
 
           <WarehousePagination
             result={query.isError ? undefined : query.data}

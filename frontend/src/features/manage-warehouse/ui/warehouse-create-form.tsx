@@ -6,6 +6,8 @@ import { DialogFooter } from '@/shared/ui/dialog';
 import {
   getWarehouseErrorMessage,
   warehouseCreateSchema,
+  WAREHOUSE_DIMENSION_MIN,
+  WAREHOUSE_DIMENSION_MAX,
   type WarehouseCreateInput,
 } from '@/entities/warehouse';
 
@@ -76,8 +78,8 @@ export function WarehouseCreateForm({ onSubmit, onCancel }: Props) {
               id={`warehouse-${field.name}`}
               type="number"
               inputMode="numeric"
-              min={1}
-              max={500}
+              min={WAREHOUSE_DIMENSION_MIN}
+              max={WAREHOUSE_DIMENSION_MAX}
               step={1}
               aria-invalid={Boolean(errors[field.name])}
               aria-describedby={

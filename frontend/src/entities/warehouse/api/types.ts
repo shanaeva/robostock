@@ -25,7 +25,7 @@ export const defaultWarehouseListParams: WarehouseListParams = {
   sortOrder: 'asc',
 };
 
-export interface WarehouseDataSource {
+export type WarehouseDataSource = {
   readonly mode: 'mock' | 'http';
   list(
     params: WarehouseListParams,
@@ -39,4 +39,4 @@ export interface WarehouseDataSource {
     id: string,
     email: string,
   ) => Promise<{ email: string; role: 'Observer' }>;
-}
+};
