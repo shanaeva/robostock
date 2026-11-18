@@ -1,21 +1,32 @@
 import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
+import {
+  EMAIL_MAX_LENGTH,
+  NAME_MAX_LENGTH,
+  NAME_MIN_LENGTH,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+} from './auth.constants.js';
 
 const normalizedEmail = z.preprocess(
   (value) => (typeof value === 'string' ? value.trim().toLowerCase() : value),
-  z.email('Введите корректную почту').max(254),
+  z.email('Введите корректную почту').max(EMAIL_MAX_LENGTH),
 );
 
 const password = z
   .string()
-  .min(8, 'Пароль должен содержать от 8 до 128 символов')
-  .max(128, 'Пароль должен содержать от 8 до 128 символов');
+  .min(PASSWORD_MIN_LENGTH, 'Пароль должен содержать от 8 до 128 символов')
+  .max(PASSWORD_MAX_LENGTH, 'Пароль должен содержать от 8 до 128 символов');
 
 const code = z.string().regex(/^\d{6}$/, 'Введите шестизначный код');
 
 export const registerSchema = z
   .object({
-    name: z.string().trim().min(2, 'Введите имя от 2 до 80 символов').max(80),
+    name: z
+      .string()
+      .trim()
+      .min(NAME_MIN_LENGTH, 'Введите имя от 2 до 80 символов')
+      .max(NAME_MAX_LENGTH),
     email: normalizedEmail,
   })
   .strict();
@@ -23,7 +34,7 @@ export const registerSchema = z
 export const loginSchema = z
   .object({
     email: normalizedEmail,
-    password: z.string().min(1).max(128),
+    password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
     rememberMe: z.boolean().default(false),
   })
   .strict();

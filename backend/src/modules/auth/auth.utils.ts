@@ -1,5 +1,5 @@
 import type { CookieOptions, Response } from 'express';
-import { ACCESS_TTL_SECONDS } from './auth.service.js';
+import { ACCESS_TTL_SECONDS } from './auth.constants.js';
 import type { AuthService } from './auth.service.js';
 
 export function cookieOptions(nodeEnv: string): CookieOptions {

@@ -18,13 +18,9 @@ import {
 } from './auth.crypto.js';
 import { MailService } from '../mail/mail.service.js';
 import { AuthRepository } from './auth.repository.js';
+import { ACCESS_TTL_SECONDS, SESSION_TTL_MS } from './auth.constants.js';
 
-export const ACCESS_TTL_SECONDS = 15 * 60;
-
-const SESSION_TTL_MS = {
-  short: 24 * 60 * 60 * 1000,
-  long: 7 * 24 * 60 * 60 * 1000,
-};
+export { ACCESS_TTL_SECONDS };
 
 const INVALID_CODE =
   'Код неверен, истёк или уже использован. Запросите новый код.';

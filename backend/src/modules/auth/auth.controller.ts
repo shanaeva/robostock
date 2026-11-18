@@ -14,6 +14,7 @@ import type { Request, Response } from 'express';
 import { readCookie } from '../../common/cookies.js';
 import type { Environment } from '../../config/environment.js';
 import { createCsrf, verifyCsrf } from './auth.crypto.js';
+import { CSRF_TTL_MS } from './auth.constants.js';
 import {
   clearCredentials,
   cookieOptions,
@@ -62,7 +63,7 @@ export class AuthController {
     response.cookie('csrf_token', csrfToken, {
       ...cookieOptions(this.nodeEnv),
       httpOnly: false,
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: CSRF_TTL_MS,
     });
     return { csrfToken };
   }
