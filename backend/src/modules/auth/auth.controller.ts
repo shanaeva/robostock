@@ -10,10 +10,15 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { CookieOptions, Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { readCookie } from '../../common/cookies.js';
 import type { Environment } from '../../config/environment.js';
 import { createCsrf, verifyCsrf } from './auth.crypto.js';
+import {
+  clearCredentials,
+  cookieOptions,
+  setCredentials,
+} from './auth.utils.js';
 import {
   AuthGuard,
   SecurityGuard,
@@ -28,7 +33,7 @@ import {
   resetPasswordSchema,
   verifyEmailSchema,
 } from './auth.schemas.js';
-import { ACCESS_TTL_SECONDS, AuthService } from './auth.service.js';
+import { AuthService } from './auth.service.js';
 
 @Controller('auth')
 @UseGuards(SecurityGuard)
@@ -44,37 +49,6 @@ export class AuthController {
     this.csrfSecret = config.getOrThrow('CSRF_SECRET');
   }
 
-  private cookieOptions(): CookieOptions {
-    return {
-      httpOnly: true,
-      secure: this.nodeEnv === 'production',
-      sameSite: this.nodeEnv === 'production' ? 'strict' : 'lax',
-      path: '/',
-    };
-  }
-
-  private setCredentials(
-    response: Response,
-    result: Awaited<ReturnType<AuthService['login']>>,
-    rememberMe: boolean,
-    sessionExpiresAt?: Date,
-  ): void {
-    const options = this.cookieOptions();
-    response.cookie('access_token', result.accessToken, {
-      ...options,
-      ...(rememberMe ? { maxAge: ACCESS_TTL_SECONDS * 1000 } : {}),
-    });
-    response.cookie('refresh_token', result.refreshToken, {
-      ...options,
-      ...(rememberMe && sessionExpiresAt ? { expires: sessionExpiresAt } : {}),
-    });
-  }
-
-  private clearCredentials(response: Response): void {
-    response.clearCookie('access_token', this.cookieOptions());
-    response.clearCookie('refresh_token', this.cookieOptions());
-  }
-
   @Get('csrf')
   csrf(
     @Req() request: Request,
@@ -86,7 +60,7 @@ export class AuthController {
         ? existing
         : createCsrf(this.csrfSecret);
     response.cookie('csrf_token', csrfToken, {
-      ...this.cookieOptions(),
+      ...cookieOptions(this.nodeEnv),
       httpOnly: false,
       maxAge: 24 * 60 * 60 * 1000,
     });
@@ -126,7 +100,7 @@ export class AuthController {
   ) {
     const input = parseInput(loginSchema, body);
     const result = await this.auth.login(input);
-    this.setCredentials(response, result, input.rememberMe);
+    setCredentials(response, result, input.rememberMe, this.nodeEnv);
     return { user: result.user };
   }
 
@@ -146,10 +120,10 @@ export class AuthController {
       const result = await this.auth.refresh(
         readCookie(request, 'refresh_token'),
       );
-      this.setCredentials(response, result, false);
+      setCredentials(response, result, false, this.nodeEnv);
       return { user: result.user };
     } catch (error) {
-      this.clearCredentials(response);
+      clearCredentials(response, this.nodeEnv);
       throw error;
     }
   }
@@ -164,7 +138,7 @@ export class AuthController {
       readCookie(request, 'access_token'),
       readCookie(request, 'refresh_token'),
     );
-    this.clearCredentials(response);
+    clearCredentials(response, this.nodeEnv);
     return result;
   }
 
@@ -176,7 +150,7 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.auth.logoutAll(request.auth!.user.id);
-    this.clearCredentials(response);
+    clearCredentials(response, this.nodeEnv);
     return result;
   }
 
