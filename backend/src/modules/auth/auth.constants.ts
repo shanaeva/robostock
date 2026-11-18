@@ -14,3 +14,9 @@ export const SESSION_TTL_MS = {
 };
 
 export const CSRF_TTL_MS = 24 * 60 * 60 * 1000;
+
+export const CODE_TTL_MS = 15 * 60 * 1000;
+
+export const REFRESH_TOKEN_MAX_LENGTH = 128;
+
+export const JWT_MAX_LENGTH = 4096;

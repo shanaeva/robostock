@@ -15,8 +15,14 @@ const normalizedEmail = z.preprocess(
 
 const password = z
   .string()
-  .min(PASSWORD_MIN_LENGTH, 'Пароль должен содержать от 8 до 128 символов')
-  .max(PASSWORD_MAX_LENGTH, 'Пароль должен содержать от 8 до 128 символов');
+  .min(
+    PASSWORD_MIN_LENGTH,
+    `Пароль должен содержать от ${PASSWORD_MIN_LENGTH} до ${PASSWORD_MAX_LENGTH} символов`,
+  )
+  .max(
+    PASSWORD_MAX_LENGTH,
+    `Пароль должен содержать от ${PASSWORD_MIN_LENGTH} до ${PASSWORD_MAX_LENGTH} символов`,
+  );
 
 const code = z.string().regex(/^\d{6}$/, 'Введите шестизначный код');
 
@@ -25,8 +31,14 @@ export const registerSchema = z
     name: z
       .string()
       .trim()
-      .min(NAME_MIN_LENGTH, 'Введите имя от 2 до 80 символов')
-      .max(NAME_MAX_LENGTH),
+      .min(
+        NAME_MIN_LENGTH,
+        `Введите имя от ${NAME_MIN_LENGTH} до ${NAME_MAX_LENGTH} символов`,
+      )
+      .max(
+        NAME_MAX_LENGTH,
+        `Введите имя от ${NAME_MIN_LENGTH} до ${NAME_MAX_LENGTH} символов`,
+      ),
     email: normalizedEmail,
   })
   .strict();

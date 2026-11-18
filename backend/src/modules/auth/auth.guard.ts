@@ -8,6 +8,7 @@ import {
 import type { CanActivate, ExecutionContext } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
+import { CODE_TTL_MS, EMAIL_MAX_LENGTH } from './auth.constants.js';
 import { readCookie } from '../../common/cookies.js';
 import type { Environment } from '../../config/environment.js';
 import { safeEqual, verifyCsrf } from './auth.crypto.js';
@@ -73,12 +74,12 @@ export class SecurityGuard implements CanActivate {
           typeof body === 'object' && body !== null && 'email' in body
             ? body.email
             : undefined;
-        if (typeof email === 'string' && email.length <= 254) {
+        if (typeof email === 'string' && email.length <= EMAIL_MAX_LENGTH) {
           allowed =
             this.limiter.consume(
               `auth-email:${email.trim().toLowerCase()}`,
               10,
-              15 * 60_000,
+              CODE_TTL_MS,
             ) && allowed;
         }
       }

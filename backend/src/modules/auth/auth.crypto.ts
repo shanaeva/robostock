@@ -6,6 +6,7 @@ import {
   scrypt,
   timingSafeEqual,
 } from 'node:crypto';
+import { REFRESH_TOKEN_MAX_LENGTH } from './auth.constants.js';
 
 // OWASP scrypt baseline: N=2^17, r=8, p=1. Each call uses ~128 MiB of memory.
 const SCRYPT_OPTIONS = { N: 131072, r: 8, p: 1, maxmem: 256 * 1024 * 1024 };
@@ -85,7 +86,7 @@ export function createCsrf(secret: string): string {
 }
 
 export function verifyCsrf(secret: string, token: string): boolean {
-  if (token.length > 128) return false;
+  if (token.length > REFRESH_TOKEN_MAX_LENGTH) return false;
   const [nonce, signature, extra] = token.split('.');
   if (!nonce || !signature || extra !== undefined) return false;
   const expected = createHmac('sha256', secret)

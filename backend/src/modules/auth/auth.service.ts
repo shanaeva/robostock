@@ -18,7 +18,13 @@ import {
 } from './auth.crypto.js';
 import { MailService } from '../mail/mail.service.js';
 import { AuthRepository } from './auth.repository.js';
-import { ACCESS_TTL_SECONDS, SESSION_TTL_MS } from './auth.constants.js';
+import {
+  ACCESS_TTL_SECONDS,
+  CODE_TTL_MS,
+  JWT_MAX_LENGTH,
+  REFRESH_TOKEN_MAX_LENGTH,
+  SESSION_TTL_MS,
+} from './auth.constants.js';
 
 export { ACCESS_TTL_SECONDS };
 
@@ -86,7 +92,7 @@ export class AuthService {
       userId: id,
       purpose: 'VERIFY_EMAIL',
       digest,
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      expiresAt: new Date(Date.now() + CODE_TTL_MS),
     });
     this.mail.sendCodeFireAndForget(input.email, code, 'VERIFY_EMAIL');
 
@@ -105,7 +111,7 @@ export class AuthService {
       userId: user.id,
       purpose: 'VERIFY_EMAIL',
       digest,
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      expiresAt: new Date(Date.now() + CODE_TTL_MS),
     });
     this.mail.sendCodeFireAndForget(email, code, 'VERIFY_EMAIL');
     return ok;
@@ -180,7 +186,7 @@ export class AuthService {
   }
 
   async refresh(rawToken: string | undefined) {
-    if (!rawToken || rawToken.length > 128) {
+    if (!rawToken || rawToken.length > REFRESH_TOKEN_MAX_LENGTH) {
       throw new UnauthorizedException('Сессия истекла. Войдите заново.');
     }
 
@@ -214,13 +220,13 @@ export class AuthService {
     accessToken: string | undefined,
     refreshToken: string | undefined,
   ) {
-    if (refreshToken && refreshToken.length <= 128) {
+    if (refreshToken && refreshToken.length <= REFRESH_TOKEN_MAX_LENGTH) {
       const found = await this.repository.findRefreshToken(
         tokenDigest(refreshToken),
       );
       if (found) await this.repository.revokeSession(found.sessionId);
     }
-    if (accessToken && accessToken.length <= 4096) {
+    if (accessToken && accessToken.length <= JWT_MAX_LENGTH) {
       try {
         const { sessionId } = await this.parseClaims(accessToken);
         await this.repository.revokeSession(sessionId);
@@ -246,7 +252,7 @@ export class AuthService {
       userId: user.id,
       purpose: 'RESET_PASSWORD',
       digest,
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      expiresAt: new Date(Date.now() + CODE_TTL_MS),
     });
     this.mail.sendCodeFireAndForget(email, code, 'RESET_PASSWORD');
     return ok;
@@ -306,7 +312,7 @@ export class AuthService {
   }
 
   async authenticate(token: string | undefined) {
-    if (!token || token.length > 4096) {
+    if (!token || token.length > JWT_MAX_LENGTH) {
       throw new UnauthorizedException('Войдите в аккаунт');
     }
     try {
