@@ -81,6 +81,9 @@ describe('Auth API with PostgreSQL', () => {
     const code = await prisma.emailCode
       .findFirst({ where: { user: { email } } })
       .then(async (record) => {
+        if (!record) {
+          throw new Error(`No email code found for ${email}`);
+        }
         // Decode digest back is not possible — reset with known code instead.
         const { codeDigest } =
           await import('../src/modules/auth/auth.crypto.js');
@@ -88,7 +91,7 @@ describe('Auth API with PostgreSQL', () => {
         const cfg = app?.get(ConfigService);
         const knownCode = '123456';
         await prisma.emailCode.update({
-          where: { id: record?.id ?? '' },
+          where: { id: record.id },
           data: {
             digest: codeDigest(
               cfg?.get('AUTH_CODE_SECRET') as string,
