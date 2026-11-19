@@ -76,6 +76,7 @@ describe('environmentSchema', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       const messages = result.error.issues
         .map((issue) => issue.message)

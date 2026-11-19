@@ -48,9 +48,11 @@ export class UsersService {
       where: { id },
       select: userSelect,
     });
+
     if (!user) {
       throw new NotFoundException('User not found');
     }
+
     return user;
   }
 }
