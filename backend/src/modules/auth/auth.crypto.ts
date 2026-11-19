@@ -23,7 +23,7 @@ function derive(password: string, salt: string): Promise<Buffer> {
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString('hex');
   const key = await derive(password, salt);
-  return `scrypt$${SCRYPT_OPTIONS.N}$8$1$${salt}$${key.toString('hex')}`;
+  return `scrypt$${String(SCRYPT_OPTIONS.N)}$8$1$${salt}$${key.toString('hex')}`;
 }
 
 export async function verifyPassword(

@@ -343,11 +343,11 @@ export class AuthService {
       .setIssuer('robostock')
       .setAudience('robostock-web')
       .setIssuedAt()
-      .setExpirationTime(`${ACCESS_TTL_SECONDS}s`)
+      .setExpirationTime(`${String(ACCESS_TTL_SECONDS)}s`)
       .sign(this.jwtKey);
 
     return {
-      user: publicUser(user as User),
+      user: publicUser(user),
       accessToken,
       refreshToken,
       sessionId,
@@ -363,6 +363,6 @@ export class AuthService {
     if (typeof payload.sub !== 'string' || typeof payload.sid !== 'string') {
       throw new Error('Invalid claims');
     }
-    return { userId: payload.sub, sessionId: payload.sid as string };
+    return { userId: payload.sub, sessionId: payload.sid };
   }
 }

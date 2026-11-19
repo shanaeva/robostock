@@ -17,7 +17,7 @@ function hashPassword(password: string): Promise<string> {
       if (err) reject(err);
       else
         resolve(
-          `scrypt$${SCRYPT_OPTIONS.N}$8$1$${salt}$${key.toString('hex')}`,
+          `scrypt$${String(SCRYPT_OPTIONS.N)}$8$1$${salt}$${key.toString('hex')}`,
         );
     });
   });

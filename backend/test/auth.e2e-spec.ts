@@ -83,13 +83,13 @@ describe('Auth API with PostgreSQL', () => {
         const { codeDigest } =
           await import('../src/modules/auth/auth.crypto.js');
         const { ConfigService } = await import('@nestjs/config');
-        const cfg = app!.get(ConfigService);
+        const cfg = app?.get(ConfigService);
         const knownCode = '123456';
         await prisma.emailCode.update({
-          where: { id: record!.id },
+          where: { id: record?.id ?? '' },
           data: {
             digest: codeDigest(
-              cfg.get('AUTH_CODE_SECRET') as string,
+              cfg?.get('AUTH_CODE_SECRET') as string,
               email,
               'VERIFY_EMAIL',
               knownCode,
@@ -120,7 +120,9 @@ describe('Auth API with PostgreSQL', () => {
     it('возвращает emailEnabled', async () => {
       const res = await request(server).get('/auth/settings');
       expect(res.status).toBe(200);
-      expect(typeof res.body.emailEnabled).toBe('boolean');
+      expect(typeof (res.body as { emailEnabled: unknown }).emailEnabled).toBe(
+        'boolean',
+      );
     });
   });
 
@@ -153,7 +155,7 @@ describe('Auth API with PostgreSQL', () => {
       await register();
       const res = await verifyAndSetPassword();
       expect(res.status).toBe(200);
-      expect(res.body.message).toBeTruthy();
+      expect((res.body as { message: unknown }).message).toBeTruthy();
       const cookies = (res.headers['set-cookie'] as string[] | undefined) ?? [];
       expect(cookies.some((c) => c.startsWith('access_token='))).toBe(false);
     });
@@ -193,7 +195,7 @@ describe('Auth API with PostgreSQL', () => {
     it('возвращает данные пользователя при успешном входе', async () => {
       const res = await login();
       expect(res.status).toBe(200);
-      expect(res.body.user).toMatchObject({
+      expect((res.body as { user: unknown }).user).toMatchObject({
         email: REGISTER_INPUT.email,
         name: REGISTER_INPUT.name,
         emailVerified: true,
@@ -213,12 +215,16 @@ describe('Auth API with PostgreSQL', () => {
       await register();
       await verifyAndSetPassword();
       const loginRes = await login();
-      const cookies = (loginRes.headers['set-cookie'] as string[]).join('; ');
+      const cookies = (
+        loginRes.headers['set-cookie'] as unknown as string[]
+      ).join('; ');
 
       const res = await request(server).get('/auth/me').set('Cookie', cookies);
 
       expect(res.status).toBe(200);
-      expect(res.body.user.email).toBe(REGISTER_INPUT.email);
+      expect((res.body as { user: { email: string } }).user.email).toBe(
+        REGISTER_INPUT.email,
+      );
     });
   });
 
@@ -227,12 +233,14 @@ describe('Auth API with PostgreSQL', () => {
       await register();
       await verifyAndSetPassword();
       const loginRes = await login();
-      const cookies = (loginRes.headers['set-cookie'] as string[]).join('; ');
+      const cookies = (
+        loginRes.headers['set-cookie'] as unknown as string[]
+      ).join('; ');
 
       const { cookie: csrfCookie, token } = await getCsrf();
       const logoutRes = await request(server)
         .post('/auth/logout')
-        .set('Cookie', `${cookies}; ${csrfCookie.split(';')[0]}`)
+        .set('Cookie', `${cookies}; ${csrfCookie.split(';')[0] ?? ''}`)
         .set('X-CSRF-Token', token);
 
       expect(logoutRes.status).toBe(200);

@@ -108,7 +108,8 @@ export class AuthController {
   @Get('me')
   @UseGuards(AuthGuard)
   me(@Req() request: AuthenticatedRequest) {
-    return { user: request.auth!.user };
+    const { auth } = request;
+    return { user: auth?.user };
   }
 
   @Post('refresh')
@@ -150,7 +151,8 @@ export class AuthController {
     @Req() request: AuthenticatedRequest,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const result = await this.auth.logoutAll(request.auth!.user.id);
+    const { auth } = request;
+    const result = await this.auth.logoutAll(auth?.user.id ?? '');
     clearCredentials(response, this.nodeEnv);
     return result;
   }

@@ -2,7 +2,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Prisma } from '../../generated/prisma/client.js';
+import { Prisma, UserRole } from '../../generated/prisma/client.js';
 import type { User } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { UsersService } from './users.service.js';
@@ -26,6 +26,7 @@ describe('UsersService', () => {
     id: 'b8ce249d-8a13-4bd0-8f19-acac66c7464e',
     email: 'test@example.com',
     name: 'Alex',
+    role: UserRole.USER,
     passwordHash: 'scrypt$131072$8$1$abc$def',
     verifiedAt: null,
     createdAt: new Date('2026-11-10T09:00:00.000Z'),
@@ -49,7 +50,10 @@ describe('UsersService', () => {
     const input = { email: user.email, name: user.name };
     await expect(service.create(input)).resolves.toEqual(user);
     expect(prisma.user.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ email: user.email, name: user.name }),
+      data: expect.objectContaining({
+        email: user.email,
+        name: user.name,
+      }) as unknown,
       select: publicFields,
     });
   });
