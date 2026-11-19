@@ -5,13 +5,13 @@ import { useRouter } from 'next/navigation';
 import type { CurrentUser } from '@/entities/user';
 import { apiFetch } from '@/shared/api';
 
-interface AuthResponse {
+type AuthResponse = {
   user: CurrentUser;
-}
+};
 
-interface MessageResponse {
+type MessageResponse = {
   message: string;
-}
+};
 
 export function useLogin() {
   const queryClient = useQueryClient();

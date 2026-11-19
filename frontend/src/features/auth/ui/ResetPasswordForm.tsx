@@ -6,11 +6,11 @@ import { useForm } from 'react-hook-form';
 import { ApiError } from '@/shared/api';
 import { useResetPassword } from '../api';
 
-interface FormValues {
+type FormValues = {
   code: string;
   newPassword: string;
   confirmPassword: string;
-}
+};
 
 export function ResetPasswordForm({ email }: { email: string }) {
   const router = useRouter();

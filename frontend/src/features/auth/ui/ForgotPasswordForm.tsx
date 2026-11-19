@@ -5,9 +5,9 @@ import { useForm } from 'react-hook-form';
 import { ApiError } from '@/shared/api';
 import { useForgotPassword } from '../api';
 
-interface FormValues {
+type FormValues = {
   email: string;
-}
+};
 
 export function ForgotPasswordForm({
   defaultEmail,

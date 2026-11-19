@@ -4,13 +4,13 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import type { CurrentUser } from '@/entities/user';
 import { apiFetch } from '@/shared/api';
 
-interface AuthResponse {
+type AuthResponse = {
   user: CurrentUser;
-}
+};
 
-interface MessageResponse {
+type MessageResponse = {
   message: string;
-}
+};
 
 export type { AuthResponse, MessageResponse };
 

@@ -6,10 +6,10 @@ import { useForm, useWatch } from 'react-hook-form';
 import { ApiError } from '@/shared/api';
 import { useRegister } from '../model';
 
-interface FormValues {
+type FormValues = {
   name: string;
   email: string;
-}
+};
 
 export function RegisterForm({
   defaultEmail,

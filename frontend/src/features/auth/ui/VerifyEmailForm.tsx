@@ -7,11 +7,11 @@ import { useForm } from 'react-hook-form';
 import { ApiError } from '@/shared/api';
 import { useResendVerification, useVerifyEmail } from '../api';
 
-interface FormValues {
+type FormValues = {
   code: string;
   password: string;
   confirmPassword: string;
-}
+};
 
 export function VerifyEmailForm({
   email,

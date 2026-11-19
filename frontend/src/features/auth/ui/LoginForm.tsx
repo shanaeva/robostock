@@ -6,11 +6,11 @@ import { useForm, useWatch } from 'react-hook-form';
 import { ApiError } from '@/shared/api';
 import { useLogin } from '../model';
 
-interface FormValues {
+type FormValues = {
   email: string;
   password: string;
   rememberMe: boolean;
-}
+};
 
 export function LoginForm({ defaultEmail }: { defaultEmail?: string }) {
   const { register, handleSubmit, reset, control } = useForm<FormValues>({
