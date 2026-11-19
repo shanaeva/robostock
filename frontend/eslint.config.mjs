@@ -29,6 +29,9 @@ const eslintConfig = defineConfig([
         { blankLine: 'always', prev: '*', next: 'return' },
       ],
 
+      // Prefer type over interface
+      '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
+
       // Prefer const over let when possible
       'prefer-const': 'error',
 
@@ -49,6 +52,9 @@ const eslintConfig = defineConfig([
 
       // Warn about console.log, but allow warn and error
       'no-console': ['warn', { allow: ['warn', 'error'] }],
+
+      // Warn about nested ternary operators
+      'no-nested-ternary': 'warn',
     },
   },
 ]);
