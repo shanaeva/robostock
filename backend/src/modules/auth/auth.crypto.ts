@@ -14,8 +14,11 @@ const SCRYPT_OPTIONS = { N: 131072, r: 8, p: 1, maxmem: 256 * 1024 * 1024 };
 function derive(password: string, salt: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     scrypt(password, salt, 64, SCRYPT_OPTIONS, (error, key) => {
-      if (error) reject(error);
-      else resolve(key);
+      if (error) {
+        reject(error);
+      } else {
+        resolve(key);
+      }
     });
   });
 }
@@ -23,6 +26,7 @@ function derive(password: string, salt: string): Promise<Buffer> {
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString('hex');
   const key = await derive(password, salt);
+
   return `scrypt$${String(SCRYPT_OPTIONS.N)}$8$1$${salt}$${key.toString('hex')}`;
 }
 
@@ -33,6 +37,7 @@ export async function verifyPassword(
   const parts = encoded.split('$');
   const salt = parts[4];
   const expected = parts[5];
+
   if (
     parts.length !== 6 ||
     parts[0] !== 'scrypt' ||
@@ -42,9 +47,11 @@ export async function verifyPassword(
     !salt ||
     !expected ||
     !/^[a-f0-9]{128}$/.test(expected)
-  )
+  ) {
     return false;
+  }
   const key = await derive(password, salt);
+
   return timingSafeEqual(key, Buffer.from(expected, 'hex'));
 }
 
@@ -74,6 +81,7 @@ export function codeDigest(
 export function safeEqual(left: string, right: string): boolean {
   const a = Buffer.from(left);
   const b = Buffer.from(right);
+
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
@@ -82,15 +90,22 @@ export function createCsrf(secret: string): string {
   const signature = createHmac('sha256', secret)
     .update(`csrf:${nonce}`)
     .digest('base64url');
+
   return `${nonce}.${signature}`;
 }
 
 export function verifyCsrf(secret: string, token: string): boolean {
-  if (token.length > REFRESH_TOKEN_MAX_LENGTH) return false;
+  if (token.length > REFRESH_TOKEN_MAX_LENGTH) {
+    return false;
+  }
   const [nonce, signature, extra] = token.split('.');
-  if (!nonce || !signature || extra !== undefined) return false;
+
+  if (!nonce || !signature || extra !== undefined) {
+    return false;
+  }
   const expected = createHmac('sha256', secret)
     .update(`csrf:${nonce}`)
     .digest('base64url');
+
   return safeEqual(signature, expected);
 }

@@ -9,6 +9,7 @@ import { AuthService } from './auth.service.js';
 
 vi.mock('./auth.crypto.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./auth.crypto.js')>();
+
   return {
     ...actual,
     hashPassword: vi.fn().mockResolvedValue('hashed$mock'),
@@ -65,7 +66,11 @@ function makeConfig() {
         CSRF_SECRET: 'test csrf key must be at least 32 chars',
         FRONTEND_ORIGIN: 'http://localhost:3000',
       };
-      if (!(key in map)) throw new Error(`Missing env: ${key}`);
+
+      if (!(key in map)) {
+        throw new Error(`Missing env: ${key}`);
+      }
+
       return map[key];
     }),
   };

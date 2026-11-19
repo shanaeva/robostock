@@ -6,13 +6,18 @@ import type { Request } from 'express';
  */
 export function readCookie(request: Request, name: string): string | undefined {
   const header = request.headers.cookie;
-  if (!header) return undefined;
+
+  if (!header) {
+    return undefined;
+  }
   const prefix = `${name}=`;
   for (const part of header.split(';')) {
     const trimmed = part.trim();
+
     if (trimmed.startsWith(prefix)) {
       return decodeURIComponent(trimmed.slice(prefix.length));
     }
   }
+
   return undefined;
 }

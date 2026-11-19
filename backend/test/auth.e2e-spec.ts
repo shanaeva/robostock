@@ -62,11 +62,13 @@ describe('Auth API with PostgreSQL', () => {
         c.startsWith('csrf_token='),
       ) ?? '';
     const token = (res.body as { csrfToken?: string }).csrfToken ?? '';
+
     return { cookie, token };
   }
 
   async function register(input = REGISTER_INPUT) {
     const { cookie, token } = await getCsrf();
+
     return request(server)
       .post('/auth/register')
       .set('Cookie', cookie)
@@ -96,10 +98,12 @@ describe('Auth API with PostgreSQL', () => {
             ),
           },
         });
+
         return knownCode;
       });
 
     const { cookie, token } = await getCsrf();
+
     return request(server)
       .post('/auth/verify-email')
       .set('Cookie', cookie)
@@ -109,6 +113,7 @@ describe('Auth API with PostgreSQL', () => {
 
   async function login(email = REGISTER_INPUT.email, pass = PASSWORD) {
     const { cookie, token } = await getCsrf();
+
     return request(server)
       .post('/auth/login')
       .set('Cookie', cookie)

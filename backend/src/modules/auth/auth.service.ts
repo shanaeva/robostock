@@ -68,6 +68,7 @@ export class AuthService {
 
   async register(input: { name: string; email: string }) {
     const user = await this.repository.findUserByEmail(input.email);
+
     if (user) {
       return {
         message: 'Если регистрация доступна для этой почты, аккаунт создан.',
@@ -104,7 +105,10 @@ export class AuthService {
     const ok = {
       message: 'Если аккаунт существует и не подтверждён, письмо отправлено.',
     };
-    if (!user || user.verifiedAt) return ok;
+
+    if (!user || user.verifiedAt) {
+      return ok;
+    }
     const code = generateCode();
     const digest = codeDigest(this.codeSecret, email, 'VERIFY_EMAIL', code);
     await this.repository.upsertEmailCode({
@@ -114,11 +118,13 @@ export class AuthService {
       expiresAt: new Date(Date.now() + CODE_TTL_MS),
     });
     this.mail.sendCodeFireAndForget(email, code, 'VERIFY_EMAIL');
+
     return ok;
   }
 
   async verifyEmail(email: string, code: string, password: string) {
     const user = await this.repository.findUserByEmail(email);
+
     if (!user) {
       throw new BadRequestException({
         message: INVALID_CODE,
@@ -130,8 +136,11 @@ export class AuthService {
       user.id,
       'VERIFY_EMAIL',
     );
+
     if (!record || record.digest !== digest) {
-      if (record) await this.repository.incrementCodeAttempts(record.id);
+      if (record) {
+        await this.repository.incrementCodeAttempts(record.id);
+      }
       throw new BadRequestException({
         message: INVALID_CODE,
         code: 'INVALID_CODE',
@@ -224,8 +233,12 @@ export class AuthService {
       const found = await this.repository.findRefreshToken(
         tokenDigest(refreshToken),
       );
-      if (found) await this.repository.revokeSession(found.sessionId);
+
+      if (found) {
+        await this.repository.revokeSession(found.sessionId);
+      }
     }
+
     if (accessToken && accessToken.length <= JWT_MAX_LENGTH) {
       try {
         const { sessionId } = await this.parseClaims(accessToken);
@@ -234,18 +247,23 @@ export class AuthService {
         // Invalid token is fine — cookies are cleared anyway.
       }
     }
+
     return { message: 'Вы вышли из аккаунта.' };
   }
 
   async logoutAll(userId: string) {
     await this.repository.revokeAllUserSessions(userId);
+
     return { message: 'Все сессии завершены.' };
   }
 
   async forgotPassword(email: string) {
     const ok = { message: 'Если аккаунт существует, письмо отправлено.' };
     const user = await this.repository.findUserByEmail(email);
-    if (!user || !user.verifiedAt) return ok;
+
+    if (!user || !user.verifiedAt) {
+      return ok;
+    }
     const code = generateCode();
     const digest = codeDigest(this.codeSecret, email, 'RESET_PASSWORD', code);
     await this.repository.upsertEmailCode({
@@ -255,6 +273,7 @@ export class AuthService {
       expiresAt: new Date(Date.now() + CODE_TTL_MS),
     });
     this.mail.sendCodeFireAndForget(email, code, 'RESET_PASSWORD');
+
     return ok;
   }
 
@@ -264,6 +283,7 @@ export class AuthService {
     newPassword: string;
   }) {
     const user = await this.repository.findUserByEmail(input.email);
+
     if (!user) {
       throw new BadRequestException({
         message: INVALID_CODE,
@@ -280,8 +300,11 @@ export class AuthService {
       user.id,
       'RESET_PASSWORD',
     );
+
     if (!record || record.digest !== digest) {
-      if (record) await this.repository.incrementCodeAttempts(record.id);
+      if (record) {
+        await this.repository.incrementCodeAttempts(record.id);
+      }
       throw new BadRequestException({
         message: INVALID_CODE,
         code: 'INVALID_CODE',
@@ -318,6 +341,7 @@ export class AuthService {
     try {
       const { userId, sessionId } = await this.parseClaims(token);
       const session = await this.repository.findSessionWithUser(sessionId);
+
       if (
         !session ||
         session.userId !== userId ||
@@ -326,6 +350,7 @@ export class AuthService {
       ) {
         throw new Error('Session invalid');
       }
+
       return { user: publicUser(session.user), sessionId };
     } catch {
       throw new UnauthorizedException('Сессия истекла. Войдите заново.');
@@ -360,9 +385,11 @@ export class AuthService {
       issuer: 'robostock',
       audience: 'robostock-web',
     });
+
     if (typeof payload.sub !== 'string' || typeof payload.sid !== 'string') {
       throw new Error('Invalid claims');
     }
+
     return { userId: payload.sub, sessionId: payload.sid };
   }
 }

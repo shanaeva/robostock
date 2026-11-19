@@ -31,7 +31,13 @@ describe('UsersService', () => {
     verifiedAt: null,
     createdAt: new Date('2026-11-10T09:00:00.000Z'),
   };
-  const publicFields = { id: true, email: true, name: true, createdAt: true };
+  const publicFields = {
+    id: true,
+    email: true,
+    name: true,
+    role: true,
+    createdAt: true,
+  };
 
   beforeEach(async () => {
     prisma = createPrismaMock();

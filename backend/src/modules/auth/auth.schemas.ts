@@ -69,11 +69,13 @@ export const resetPasswordSchema = z
 
 export function parseInput<T>(schema: z.ZodType<T>, input: unknown): T {
   const result = schema.safeParse(input);
+
   if (!result.success) {
     throw new BadRequestException({
       message: result.error.issues[0]?.message ?? 'Некорректные данные',
       code: 'INVALID_INPUT',
     });
   }
+
   return result.data;
 }

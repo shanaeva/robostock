@@ -37,7 +37,9 @@ export class MailService {
     code: string,
     purpose: 'VERIFY_EMAIL' | 'RESET_PASSWORD',
   ): Promise<void> {
-    if (!this.transport) return;
+    if (!this.transport) {
+      return;
+    }
     const subject =
       purpose === 'VERIFY_EMAIL' ? 'Подтвердите почту' : 'Сброс пароля';
     await this.transport.sendMail({

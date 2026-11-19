@@ -31,17 +31,29 @@ class WindowLimiter {
     now = Date.now(),
   ): boolean {
     const previous = this.windows.get(key);
+
     if (previous && previous.until > now) {
-      if (previous.count >= limit) return false;
+      if (previous.count >= limit) {
+        return false;
+      }
       previous.count += 1;
+
       return true;
     }
+
     if (this.windows.size >= 20_000) {
-      for (const [k, v] of this.windows)
-        if (v.until <= now) this.windows.delete(k);
-      if (this.windows.size >= 20_000) return false;
+      for (const [k, v] of this.windows) {
+        if (v.until <= now) {
+          this.windows.delete(k);
+        }
+      }
+
+      if (this.windows.size >= 20_000) {
+        return false;
+      }
     }
     this.windows.set(key, { count: 1, until: now + durationMs });
+
     return true;
   }
 }
@@ -67,6 +79,7 @@ export class SecurityGuard implements CanActivate {
     if (this.rateLimitEnabled) {
       const ip = request.ip ?? request.socket.remoteAddress ?? 'unknown';
       let allowed = this.limiter.consume(`global:${ip}`, 120, 60_000);
+
       if (unsafe) {
         allowed = this.limiter.consume(`auth-ip:${ip}`, 30, 60_000) && allowed;
         const body: unknown = request.body;
@@ -74,6 +87,7 @@ export class SecurityGuard implements CanActivate {
           typeof body === 'object' && body !== null && 'email' in body
             ? body.email
             : undefined;
+
         if (typeof email === 'string' && email.length <= EMAIL_MAX_LENGTH) {
           allowed =
             this.limiter.consume(
@@ -83,6 +97,7 @@ export class SecurityGuard implements CanActivate {
             ) && allowed;
         }
       }
+
       if (!allowed) {
         throw new HttpException(
           {
@@ -94,9 +109,12 @@ export class SecurityGuard implements CanActivate {
       }
     }
 
-    if (!unsafe) return true;
+    if (!unsafe) {
+      return true;
+    }
 
     const origin = request.get('origin');
+
     if (this.frontendOrigin && origin && origin !== this.frontendOrigin) {
       throw new ForbiddenException({
         message: 'Недопустимый источник запроса',
@@ -106,6 +124,7 @@ export class SecurityGuard implements CanActivate {
 
     const cookie = readCookie(request, 'csrf_token');
     const header = request.get('x-csrf-token');
+
     if (
       !cookie ||
       !header ||
@@ -131,6 +150,7 @@ export class AuthGuard implements CanActivate {
     request.auth = await this.auth.authenticate(
       readCookie(request, 'access_token'),
     );
+
     return true;
   }
 }
@@ -142,6 +162,7 @@ export class OptionalAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const token = readCookie(request, 'access_token');
+
     if (token) {
       try {
         request.auth = await this.auth.authenticate(token);
@@ -149,6 +170,7 @@ export class OptionalAuthGuard implements CanActivate {
         throw new UnauthorizedException('Сессия истекла. Войдите заново.');
       }
     }
+
     return true;
   }
 }

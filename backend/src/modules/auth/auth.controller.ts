@@ -65,6 +65,7 @@ export class AuthController {
       httpOnly: false,
       maxAge: CSRF_TTL_MS,
     });
+
     return { csrfToken };
   }
 
@@ -83,6 +84,7 @@ export class AuthController {
   @HttpCode(202)
   resendVerification(@Body() body: unknown) {
     const input = parseInput(resendVerificationSchema, body);
+
     return this.auth.resendVerification(input.email);
   }
 
@@ -90,6 +92,7 @@ export class AuthController {
   @HttpCode(200)
   async verifyEmail(@Body() body: unknown) {
     const input = parseInput(verifyEmailSchema, body);
+
     return this.auth.verifyEmail(input.email, input.code, input.password);
   }
 
@@ -102,6 +105,7 @@ export class AuthController {
     const input = parseInput(loginSchema, body);
     const result = await this.auth.login(input);
     setCredentials(response, result, input.rememberMe, this.nodeEnv);
+
     return { user: result.user };
   }
 
@@ -109,6 +113,7 @@ export class AuthController {
   @UseGuards(AuthGuard)
   me(@Req() request: AuthenticatedRequest) {
     const { auth } = request;
+
     return { user: auth?.user };
   }
 
@@ -123,6 +128,7 @@ export class AuthController {
         readCookie(request, 'refresh_token'),
       );
       setCredentials(response, result, false, this.nodeEnv);
+
       return { user: result.user };
     } catch (error) {
       clearCredentials(response, this.nodeEnv);
@@ -141,6 +147,7 @@ export class AuthController {
       readCookie(request, 'refresh_token'),
     );
     clearCredentials(response, this.nodeEnv);
+
     return result;
   }
 
@@ -154,6 +161,7 @@ export class AuthController {
     const { auth } = request;
     const result = await this.auth.logoutAll(auth?.user.id ?? '');
     clearCredentials(response, this.nodeEnv);
+
     return result;
   }
 
@@ -161,6 +169,7 @@ export class AuthController {
   @HttpCode(202)
   forgotPassword(@Body() body: unknown) {
     const input = parseInput(forgotPasswordSchema, body);
+
     return this.auth.forgotPassword(input.email);
   }
 
@@ -168,6 +177,7 @@ export class AuthController {
   @HttpCode(200)
   async resetPassword(@Body() body: unknown) {
     const input = parseInput(resetPasswordSchema, body);
+
     return this.auth.resetPassword(input);
   }
 }
