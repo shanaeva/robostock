@@ -39,7 +39,7 @@ async function main() {
       verifiedAt: new Date(),
     },
   });
-  console.log('Admin user seeded');
+  console.warn('Admin user seeded');
 }
 
 main()
