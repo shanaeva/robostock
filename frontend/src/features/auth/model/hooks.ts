@@ -18,7 +18,11 @@ export function useLogin() {
   const router = useRouter();
 
   return useMutation({
-    mutationFn: (data: { email: string; password: string; rememberMe: boolean }) =>
+    mutationFn: (data: {
+      email: string;
+      password: string;
+      rememberMe: boolean;
+    }) =>
       apiFetch<AuthResponse>('/auth/login', {
         method: 'POST',
         body: JSON.stringify(data),

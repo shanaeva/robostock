@@ -7,5 +7,7 @@ export default async function LoginRoute({
 }) {
   const { email } = await searchParams;
 
-  return <LoginPage defaultEmail={typeof email === 'string' ? email : undefined} />;
+  return (
+    <LoginPage defaultEmail={typeof email === 'string' ? email : undefined} />
+  );
 }

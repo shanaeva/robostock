@@ -7,5 +7,9 @@ export default async function ForgotPasswordRoute({
 }) {
   const { email } = await searchParams;
 
-  return <ForgotPasswordPage defaultEmail={typeof email === 'string' ? email : undefined} />;
+  return (
+    <ForgotPasswordPage
+      defaultEmail={typeof email === 'string' ? email : undefined}
+    />
+  );
 }

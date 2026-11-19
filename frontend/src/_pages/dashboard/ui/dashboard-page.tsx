@@ -18,7 +18,9 @@ export function DashboardPage() {
   if (isError) {
     return (
       <main className="flex flex-1 items-center justify-center px-4">
-        <p className="text-zinc-500">Не удалось загрузить профиль. Попробуйте обновить страницу.</p>
+        <p className="text-zinc-500">
+          Не удалось загрузить профиль. Попробуйте обновить страницу.
+        </p>
       </main>
     );
   }
