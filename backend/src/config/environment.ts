@@ -16,6 +16,7 @@ export const environmentSchema = z.object({
           return false;
         }
         const url = new URL(value);
+
         return url.hostname.length > 0 && url.pathname.length > 1;
       },
       { error: 'DATABASE_URL must include a host and database name' },

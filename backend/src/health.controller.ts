@@ -30,6 +30,7 @@ export class HealthController {
   async check(): Promise<z.infer<typeof healthResponseSchema>> {
     try {
       await this.prisma.$queryRaw`SELECT 1`;
+
       return { status: 'ok', database: 'up' };
     } catch {
       throw new ServiceUnavailableException();

@@ -24,6 +24,7 @@ describe('test database configuration', () => {
         getTestAdminUrl(value);
       } catch (error: unknown) {
         expect(error).toBeInstanceOf(Error);
+
         if (error instanceof Error) {
           expect(error.message).not.toContain('private_password');
         }

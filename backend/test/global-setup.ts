@@ -9,6 +9,7 @@ import { PrismaClient } from '../src/generated/prisma/client.js';
 export function getTestAdminUrl(value: unknown): URL {
   const message =
     'Set TEST_DATABASE_ADMIN_URL in .env.test to a local PostgreSQL URL ending in /postgres.';
+
   if (typeof value !== 'string') {
     throw new Error(message);
   }
@@ -18,6 +19,7 @@ export function getTestAdminUrl(value: unknown): URL {
   } catch {
     throw new Error(message);
   }
+
   if (
     !['postgres:', 'postgresql:'].includes(url.protocol) ||
     !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) ||
@@ -27,6 +29,7 @@ export function getTestAdminUrl(value: unknown): URL {
   ) {
     throw new Error(message);
   }
+
   return url;
 }
 
@@ -68,13 +71,16 @@ export default async function setup(project: TestProject) {
         timeout: 30000,
       },
     );
+
     if (result.error || result.status !== 0) {
       throw new Error('Test database migration failed.');
     }
     project.provide('testDatabaseUrl', url.href);
   } catch {
     try {
-      if (created) await dropDatabase();
+      if (created) {
+        await dropDatabase();
+      }
     } finally {
       await admin.$disconnect();
     }
@@ -89,6 +95,7 @@ export default async function setup(project: TestProject) {
         SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = ${database}
       `;
       await dropDatabase();
+
       if (connections[0]?.count !== 0) {
         throw new Error(
           'The application did not close all test database connections.',
