@@ -10,7 +10,9 @@
     "fsd:check": "steiger ./src"
   },
   "dependencies": {
+    "@pixi/react": "8.0.5",
     "next": "16.4.6",
+    "pixi.js": "8.23.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
