@@ -32,12 +32,13 @@ const INVALID_CODE =
   'Код неверен, истёк или уже использован. Запросите новый код.';
 
 export function publicUser(
-  user: Pick<User, 'id' | 'name' | 'email' | 'verifiedAt'>,
+  user: Pick<User, 'id' | 'name' | 'email' | 'role' | 'verifiedAt'>,
 ) {
   return {
     id: user.id,
     name: user.name,
     email: user.email,
+    role: user.role,
     emailVerified: user.verifiedAt !== null,
   };
 }
@@ -358,7 +359,7 @@ export class AuthService {
   }
 
   private async credentials(
-    user: User | Pick<User, 'id' | 'name' | 'email' | 'verifiedAt'>,
+    user: User | Pick<User, 'id' | 'name' | 'email' | 'role' | 'verifiedAt'>,
     sessionId: string,
     refreshToken: string,
   ) {
