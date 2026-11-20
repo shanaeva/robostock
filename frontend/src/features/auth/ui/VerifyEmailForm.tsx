@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { ApiError } from '@/shared/api';
 import { useResendVerification, useVerifyEmail } from '../api';
+import { getErrorMessage } from '../model';
 
 type FormValues = {
   code: string;
@@ -51,12 +51,7 @@ export function VerifyEmailForm({
     setCooldown(60);
   };
 
-  const errorMessage =
-    error instanceof ApiError
-      ? error.message
-      : error
-        ? 'Что-то пошло не так'
-        : null;
+  const errorMessage = getErrorMessage(error);
 
   if (isSuccess) {
     return (

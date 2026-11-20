@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { ApiError } from '@/shared/api';
 import { useResetPassword } from '../api';
+import { getErrorMessage } from '../model';
 
 type FormValues = {
   code: string;
@@ -23,12 +23,7 @@ export function ResetPasswordForm({ email }: { email: string }) {
 
   const { mutate: reset, isPending, error, isSuccess } = useResetPassword();
 
-  const errorMessage =
-    error instanceof ApiError
-      ? error.message
-      : error
-        ? 'Что-то пошло не так'
-        : null;
+  const errorMessage = getErrorMessage(error);
 
   if (isSuccess) {
     return (

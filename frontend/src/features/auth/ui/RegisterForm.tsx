@@ -3,8 +3,7 @@
 import Link from 'next/link';
 import { useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
-import { ApiError } from '@/shared/api';
-import { useRegister } from '../model';
+import { getErrorMessage, useRegister } from '../model';
 
 type FormValues = {
   name: string;
@@ -39,12 +38,7 @@ export function RegisterForm({
 
   const { mutate: registerUser, isPending, error, isSuccess } = useRegister();
 
-  const errorMessage =
-    error instanceof ApiError
-      ? error.message
-      : error
-        ? 'Что-то пошло не так'
-        : null;
+  const errorMessage = getErrorMessage(error);
 
   if (isSuccess) {
     return (

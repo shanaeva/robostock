@@ -3,8 +3,7 @@
 import Link from 'next/link';
 import { useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
-import { ApiError } from '@/shared/api';
-import { useLogin } from '../model';
+import { getErrorMessage, useLogin } from '../model';
 
 type FormValues = {
   email: string;
@@ -27,12 +26,7 @@ export function LoginForm({ defaultEmail }: { defaultEmail?: string }) {
 
   const { mutate: login, isPending, error } = useLogin();
 
-  const errorMessage =
-    error instanceof ApiError
-      ? error.message
-      : error
-        ? 'Что-то пошло не так'
-        : null;
+  const errorMessage = getErrorMessage(error);
 
   return (
     <form

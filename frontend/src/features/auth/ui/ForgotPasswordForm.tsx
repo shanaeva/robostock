@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
-import { ApiError } from '@/shared/api';
 import { useForgotPassword } from '../api';
+import { getErrorMessage } from '../model';
 
 type FormValues = {
   email: string;
@@ -23,12 +23,7 @@ export function ForgotPasswordForm({
 
   const { mutate: forgot, isPending, error, isSuccess } = useForgotPassword();
 
-  const errorMessage =
-    error instanceof ApiError
-      ? error.message
-      : error
-        ? 'Что-то пошло не так'
-        : null;
+  const errorMessage = getErrorMessage(error);
 
   if (isSuccess) {
     return (
