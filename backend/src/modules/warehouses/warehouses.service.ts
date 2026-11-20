@@ -40,11 +40,13 @@ export class WarehousesService {
       data: { ownerId, ...input },
       select: { id: true },
     });
+
     return { warehouseId: created.id };
   }
 
   async get(ownerId: string, id: string) {
     const warehouse = await this.findOwned(ownerId, id);
+
     return {
       id: warehouse.id,
       name: warehouse.name,
@@ -76,7 +78,11 @@ export class WarehousesService {
     const warehouse = await this.prisma.warehouse.findFirst({
       where: { id, ownerId },
     });
-    if (!warehouse) throw new NotFoundException(NOT_FOUND);
+
+    if (!warehouse) {
+      throw new NotFoundException(NOT_FOUND);
+    }
+
     return warehouse;
   }
 }

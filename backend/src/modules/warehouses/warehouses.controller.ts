@@ -1,4 +1,5 @@
 import {
+  applyDecorators,
   Body,
   Controller,
   Delete,
@@ -9,16 +10,21 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiHeader,
   ApiInternalServerErrorResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiTooManyRequestsResponse,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import {
   createWarehouseSchema,
@@ -35,14 +41,24 @@ import type {
   UpdateWarehouseInput,
 } from './warehouses.schemas.js';
 import { WarehousesService } from './warehouses.service.js';
+import { CurrentOwnerId } from '../../common/decorators/current-owner-id.decorator.js';
 import { apiErrorSchema } from '../../common/api-error.schema.js';
+import { AuthGuard, SecurityGuard } from '../auth/auth.guard.js';
 
-// Заглушка до появления авторизации. Должен быть валидным uuid.
-export const OWNER_ID = '4cfa132e-efa5-4148-b573-3587652e870f';
+function ProtectWarehouseWrite() {
+  return applyDecorators(
+    UseGuards(SecurityGuard),
+    ApiHeader({ name: 'X-CSRF-Token', required: true }),
+    ApiForbiddenResponse({ standardSchema: apiErrorSchema }),
+    ApiTooManyRequestsResponse({ standardSchema: apiErrorSchema }),
+  );
+}
 
 @ApiTags('warehouses')
 @ApiInternalServerErrorResponse({ standardSchema: apiErrorSchema })
+@ApiUnauthorizedResponse({ standardSchema: apiErrorSchema })
 @Controller('warehouses')
+@UseGuards(AuthGuard)
 export class WarehousesController {
   constructor(
     @Inject(WarehousesService) private readonly warehouses: WarehousesService,
@@ -56,17 +72,22 @@ export class WarehousesController {
   @ApiOkResponse({ standardSchema: warehousesResponseSchema })
   @ApiBadRequestResponse({ standardSchema: apiErrorSchema })
   list(
+    @CurrentOwnerId() ownerId: string,
     @Query({ schema: listWarehousesQuerySchema }) query: ListWarehousesQuery,
   ) {
-    return this.warehouses.list(OWNER_ID, query);
+    return this.warehouses.list(ownerId, query);
   }
 
   @Post()
+  @ProtectWarehouseWrite()
   @ApiOperation({ operationId: 'createWarehouse', summary: 'Создать склад' })
   @ApiCreatedResponse({ standardSchema: warehouseCreatedSchema })
   @ApiBadRequestResponse({ standardSchema: apiErrorSchema })
-  create(@Body({ schema: createWarehouseSchema }) input: CreateWarehouseInput) {
-    return this.warehouses.create(OWNER_ID, input);
+  create(
+    @CurrentOwnerId() ownerId: string,
+    @Body({ schema: createWarehouseSchema }) input: CreateWarehouseInput,
+  ) {
+    return this.warehouses.create(ownerId, input);
   }
 
   @Get(':id')
@@ -74,11 +95,15 @@ export class WarehousesController {
   @ApiOkResponse({ standardSchema: warehouseDetailsSchema })
   @ApiBadRequestResponse({ standardSchema: apiErrorSchema })
   @ApiNotFoundResponse({ standardSchema: apiErrorSchema })
-  get(@Param('id', { schema: warehouseIdSchema }) id: string) {
-    return this.warehouses.get(OWNER_ID, id);
+  get(
+    @CurrentOwnerId() ownerId: string,
+    @Param('id', { schema: warehouseIdSchema }) id: string,
+  ) {
+    return this.warehouses.get(ownerId, id);
   }
 
   @Patch(':id')
+  @ProtectWarehouseWrite()
   @HttpCode(204)
   @ApiOperation({
     operationId: 'updateWarehouse',
@@ -88,19 +113,24 @@ export class WarehousesController {
   @ApiBadRequestResponse({ standardSchema: apiErrorSchema })
   @ApiNotFoundResponse({ standardSchema: apiErrorSchema })
   rename(
+    @CurrentOwnerId() ownerId: string,
     @Param('id', { schema: warehouseIdSchema }) id: string,
     @Body({ schema: updateWarehouseSchema }) input: UpdateWarehouseInput,
   ) {
-    return this.warehouses.rename(OWNER_ID, id, input);
+    return this.warehouses.rename(ownerId, id, input);
   }
 
   @Delete(':id')
+  @ProtectWarehouseWrite()
   @HttpCode(204)
   @ApiOperation({ operationId: 'deleteWarehouse', summary: 'Удалить склад' })
   @ApiNoContentResponse()
   @ApiBadRequestResponse({ standardSchema: apiErrorSchema })
   @ApiNotFoundResponse({ standardSchema: apiErrorSchema })
-  remove(@Param('id', { schema: warehouseIdSchema }) id: string) {
-    return this.warehouses.remove(OWNER_ID, id);
+  remove(
+    @CurrentOwnerId() ownerId: string,
+    @Param('id', { schema: warehouseIdSchema }) id: string,
+  ) {
+    return this.warehouses.remove(ownerId, id);
   }
 }
