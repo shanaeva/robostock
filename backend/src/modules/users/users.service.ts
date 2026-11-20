@@ -7,6 +7,7 @@ import {
 import type { Pagination } from '../../common/pagination.schema.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { hashPassword, randomToken } from '../auth/auth.crypto.js';
 import type { CreateUserInput } from './users.schemas.js';
 import { userSelect } from './users.select.js';
 
@@ -15,8 +16,13 @@ export class UsersService {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async create(input: CreateUserInput) {
+    // Admin-created users have no password yet — they set one via email verification.
+    const passwordHash = await hashPassword(randomToken());
     try {
-      return await this.prisma.user.create({ data: input, select: userSelect });
+      return await this.prisma.user.create({
+        data: { ...input, passwordHash },
+        select: userSelect,
+      });
     } catch (error: unknown) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&

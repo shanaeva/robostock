@@ -19,6 +19,7 @@ export const userResponseSchema = z
     id: userIdSchema,
     email: createUserSchema.shape.email,
     name: createUserSchema.shape.name,
+    role: z.enum(['ADMIN', 'USER']),
     createdAt: z.iso.datetime(),
   })
   .meta({ id: 'User' });

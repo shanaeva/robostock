@@ -5,6 +5,7 @@ import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { HttpExceptionFilter } from './common/http-exception.filter.js';
 import { environmentSchema } from './config/environment.js';
 import { HealthController } from './health.controller.js';
+import { AuthModule } from './modules/auth/auth.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
@@ -12,16 +13,19 @@ import { PrismaModule } from './prisma/prisma.module.js';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
-      validationSchema: environmentSchema,
+      // In test, also load .env.test so tests can override dev defaults (e.g. AUTH_EMAIL_ENABLED=false).
+      envFilePath:
+        process.env.NODE_ENV === 'test' ? ['.env.test', '.env'] : '.env',
+      validate: (env) => environmentSchema.parse(env),
     }),
     PrismaModule,
+    AuthModule,
     UsersModule,
   ],
   controllers: [HealthController],
   providers: [
-    { provide: APP_PIPE, useClass: StandardSchemaValidationPipe },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
+    { provide: APP_PIPE, useClass: StandardSchemaValidationPipe },
   ],
 })
 export class AppModule implements OnApplicationShutdown {

@@ -13,3 +13,4 @@ backend/src/generated/
 !**/.env.example
 
 backups/
+frontend/next-env.d.ts

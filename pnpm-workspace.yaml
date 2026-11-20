@@ -10,6 +10,7 @@ enablePrePostScripts: true
 allowBuilds:
   '@prisma/engines': true
   '@scarf/scarf': false
+  esbuild: true
   fsevents: true
   prisma: true
   sharp: false

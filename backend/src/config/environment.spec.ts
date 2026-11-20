@@ -4,11 +4,21 @@ import { environmentSchema } from './environment.js';
 const databaseUrl =
   'postgresql://starter:local_password@127.0.0.1:5432/starter';
 
+const requiredSecrets = {
+  JWT_SECRET: 'test-secret-must-be-at-least-32-chars-long!!',
+  AUTH_CODE_SECRET: 'test-code-secret-must-be-32chars!!',
+  CSRF_SECRET: 'test-csrf-secret-must-be-32chars!!',
+};
+
 describe('environmentSchema', () => {
   it('provides defaults and accepts unrelated process variables', () => {
     expect(
-      environmentSchema.parse({ DATABASE_URL: databaseUrl, PATH: '/usr/bin' }),
-    ).toEqual({
+      environmentSchema.parse({
+        DATABASE_URL: databaseUrl,
+        PATH: '/usr/bin',
+        ...requiredSecrets,
+      }),
+    ).toMatchObject({
       NODE_ENV: 'development',
       PORT: 3000,
       DATABASE_URL: databaseUrl,
@@ -17,7 +27,11 @@ describe('environmentSchema', () => {
 
   it('coerces a valid port to a number', () => {
     expect(
-      environmentSchema.parse({ DATABASE_URL: databaseUrl, PORT: '4000' }).PORT,
+      environmentSchema.parse({
+        DATABASE_URL: databaseUrl,
+        PORT: '4000',
+        ...requiredSecrets,
+      }).PORT,
     ).toBe(4000);
   });
 

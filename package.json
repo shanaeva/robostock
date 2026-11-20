@@ -4,12 +4,15 @@
   "packageManager": "pnpm@12.18.0",
   "scripts": {
     "prepare": "husky",
+    "start": "docker compose up -d && concurrently -k -n be,fe \"pnpm --filter backend start:dev\" \"pnpm --filter frontend dev\"",
+    "end": "docker compose down; pkill -f 'nest start' 2>/dev/null; pkill -f 'next dev' 2>/dev/null; true",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",
     "@commitlint/config-conventional": "^21.2.4",
+    "concurrently": "10.0.7",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
     "prettier": "^3.9.10"
