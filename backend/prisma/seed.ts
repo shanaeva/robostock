@@ -10,6 +10,11 @@ const prisma = new PrismaClient({ adapter });
 
 const SCRYPT_OPTIONS = { N: 131072, r: 8, p: 1, maxmem: 256 * 1024 * 1024 };
 
+const ADMIN_EMAIL = 'admin1@gmail.com';
+const ADMIN_PASSWORD = 'admin1';
+const ADMIN_NAME = 'Admin';
+const ADMIN_ROLE = 'ADMIN' as const;
+
 function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString('hex');
 
@@ -27,14 +32,14 @@ function hashPassword(password: string): Promise<string> {
 }
 
 async function main() {
-  const passwordHash = await hashPassword('admin1');
+  const passwordHash = await hashPassword(ADMIN_PASSWORD);
   await prisma.user.upsert({
-    where: { email: 'admin1@gmail.com' },
+    where: { email: ADMIN_EMAIL },
     update: {},
     create: {
-      email: 'admin1@gmail.com',
-      name: 'Admin',
-      role: 'ADMIN',
+      email: ADMIN_EMAIL,
+      name: ADMIN_NAME,
+      role: ADMIN_ROLE,
       passwordHash,
       verifiedAt: new Date(),
     },
