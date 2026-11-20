@@ -46,6 +46,12 @@ export function DashboardPage() {
               <td className="py-3 pr-4 text-zinc-500">Пароль</td>
               <td className="py-3 font-medium tracking-widest">••••••••</td>
             </tr>
+            <tr className="border-b dark:border-zinc-800">
+              <td className="py-3 pr-4 text-zinc-500">Роль</td>
+              <td className="py-3 font-medium">
+                {user?.role === 'ADMIN' ? 'Администратор' : 'Пользователь'}
+              </td>
+            </tr>
             <tr>
               <td className="py-3 pr-4 text-zinc-500">Почта</td>
               <td className="py-3">
