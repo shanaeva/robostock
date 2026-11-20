@@ -35,7 +35,7 @@ import type {
   UpdateWarehouseInput,
 } from './warehouses.schemas.js';
 import { WarehousesService } from './warehouses.service.js';
-import { apiErrorSchema } from '../common/api-error.schema.js';
+import { apiErrorSchema } from '../../common/api-error.schema.js';
 
 // Заглушка до появления авторизации. Должен быть валидным uuid.
 export const OWNER_ID = '4cfa132e-efa5-4148-b573-3587652e870f';

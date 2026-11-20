@@ -4,8 +4,8 @@ import type {
   ListWarehousesQuery,
   UpdateWarehouseInput,
 } from './warehouses.schemas.js';
-import { PrismaService } from '../prisma/prisma.service.js';
-import type { Prisma, Warehouse } from '../generated/prisma/client.js';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import type { Prisma, Warehouse } from '../../generated/prisma/client.js';
 
 const NOT_FOUND = 'Склад не найден.';
 

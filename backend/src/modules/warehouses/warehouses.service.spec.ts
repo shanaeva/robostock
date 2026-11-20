@@ -1,9 +1,8 @@
 import { NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WarehousesService } from './warehouses.service.js';
-import { OWNER_ID } from './warehouses.controller.js';
 
-const ownerId = OWNER_ID;
+const ownerId = '22222222-2222-4222-8222-222222222222';
 const warehouseId = '11111111-1111-4111-8111-111111111111';
 const warehouse = {
   id: warehouseId,
@@ -71,6 +70,31 @@ describe('WarehousesService', () => {
       take: 5,
       select: { id: true, name: true, width: true, height: true },
     });
+    expect(prisma.warehouse.count).toHaveBeenCalledWith({
+      where: {
+        ownerId,
+        name: { contains: 'main', mode: 'insensitive' },
+      },
+    });
+    expect(prisma.$transaction).toHaveBeenCalledOnce();
+  });
+
+  it('lists only the owner warehouses when search is omitted', async () => {
+    prisma.$transaction.mockResolvedValue([[], 0]);
+
+    await service.list(ownerId, {
+      page: 1,
+      limit: 20,
+      sortBy: 'name',
+      sortOrder: 'asc',
+    });
+
+    expect(prisma.warehouse.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { ownerId }, skip: 0, take: 20 }),
+    );
+    expect(prisma.warehouse.count).toHaveBeenCalledWith({
+      where: { ownerId },
+    });
   });
 
   it('creates a warehouse for the owner and returns its id', async () => {
@@ -131,5 +155,23 @@ describe('WarehousesService', () => {
     expect(prisma.warehouse.findFirst).toHaveBeenCalledWith({
       where: { id: warehouseId, ownerId },
     });
+  });
+
+  it('does not rename a missing or foreign warehouse', async () => {
+    prisma.warehouse.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.rename(ownerId, warehouseId, { name: 'Renamed warehouse' }),
+    ).rejects.toThrow(NotFoundException);
+    expect(prisma.warehouse.update).not.toHaveBeenCalled();
+  });
+
+  it('does not delete a missing or foreign warehouse', async () => {
+    prisma.warehouse.findFirst.mockResolvedValue(null);
+
+    await expect(service.remove(ownerId, warehouseId)).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(prisma.warehouse.delete).not.toHaveBeenCalled();
   });
 });
