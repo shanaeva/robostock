@@ -8,6 +8,7 @@ import { HealthController } from './health.controller.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { WarehousesModule } from './modules/warehouses/warehouses.module.js';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     PrismaModule,
     AuthModule,
     UsersModule,
+    WarehousesModule,
   ],
   controllers: [HealthController],
   providers: [

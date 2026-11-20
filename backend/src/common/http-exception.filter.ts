@@ -18,24 +18,28 @@ export class HttpExceptionFilter implements ExceptionFilter {
       status === 503 ? 'Service unavailable' : 'Internal server error';
 
     if (exception instanceof HttpException && status < 500) {
-      const response = exception.getResponse();
-      const details: unknown =
-        typeof response === 'string'
-          ? response
-          : 'message' in response
-            ? response.message
-            : exception.message;
+      if (status === 400) {
+        message = 'Некорректный JSON, параметры запроса или структура changes.';
+      } else {
+        const response = exception.getResponse();
+        const details: unknown =
+          typeof response === 'string'
+            ? response
+            : 'message' in response
+              ? response.message
+              : exception.message;
 
-      message =
-        typeof details === 'string'
-          ? details
-          : Array.isArray(details)
+        message =
+          typeof details === 'string'
             ? details
-                .filter(
-                  (item: unknown): item is string => typeof item === 'string',
-                )
-                .join('; ') || exception.message
-            : exception.message;
+            : Array.isArray(details)
+              ? details
+                  .filter(
+                    (item: unknown): item is string => typeof item === 'string',
+                  )
+                  .join('; ') || exception.message
+              : exception.message;
+      }
     }
 
     if (status >= 500) {
