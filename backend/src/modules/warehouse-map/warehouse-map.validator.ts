@@ -15,26 +15,50 @@ export interface WarehouseMapState {
   objects: readonly MapObjectSnapshot[];
 }
 
-export type ValidationFailureReason =
+export type OperationFailureReason =
   'NOT_FOUND' | 'OUT_OF_BOUNDS' | 'CELL_OCCUPIED';
 
-export interface ValidationFailure {
+export interface OperationFailure {
   index: number;
-  reason: ValidationFailureReason;
+  reason: OperationFailureReason;
   change: ObjectChange;
 }
+
+export interface RobotAdjacencyFailure {
+  reason: 'ROBOT_NOT_ADJACENT_TO_STATION';
+  x: number;
+  y: number;
+  robotId?: string;
+  index?: number;
+}
+
+export type ValidationFailure = OperationFailure | RobotAdjacencyFailure;
+
+export type ValidationFailureReason = ValidationFailure['reason'];
 
 export type BatchValidationResult =
   | { valid: true; operations: ObjectChange[] }
   | { valid: false; failure: ValidationFailure };
 
 interface TrackedObject {
+  id?: string;
+  createdAt?: number;
   objectType: MapObjectType;
   x: number;
   y: number;
 }
 
 const cellKey = (x: number, y: number): string => `${String(x)},${String(y)}`;
+
+const hasAdjacentStation = (
+  stations: ReadonlySet<string>,
+  x: number,
+  y: number,
+): boolean =>
+  stations.has(cellKey(x - 1, y)) ||
+  stations.has(cellKey(x + 1, y)) ||
+  stations.has(cellKey(x, y - 1)) ||
+  stations.has(cellKey(x, y + 1));
 
 export function validateObjectChanges(
   map: WarehouseMapState,
@@ -44,7 +68,7 @@ export function validateObjectChanges(
   const occupied = new Set<string>();
 
   for (const { id, objectType, x, y } of map.objects) {
-    objects.set(id, { objectType, x, y });
+    objects.set(id, { id, objectType, x, y });
     occupied.add(cellKey(x, y));
   }
 
@@ -54,7 +78,7 @@ export function validateObjectChanges(
   const operations: ObjectChange[] = [];
 
   for (const [index, change] of changes.entries()) {
-    const fail = (reason: ValidationFailureReason): BatchValidationResult => ({
+    const fail = (reason: OperationFailureReason): BatchValidationResult => ({
       valid: false,
       failure: { index, reason, change },
     });
@@ -69,6 +93,12 @@ export function validateObjectChanges(
         return fail('CELL_OCCUPIED');
       }
       occupied.add(key);
+      objects.set(`created:${String(index)}`, {
+        createdAt: index,
+        objectType: change.objectType,
+        x: change.x,
+        y: change.y,
+      });
       operations.push(change);
       continue;
     }
@@ -103,6 +133,29 @@ export function validateObjectChanges(
     target.x = change.x;
     target.y = change.y;
     operations.push(change);
+  }
+
+  const stations = new Set<string>();
+
+  for (const { objectType, x, y } of objects.values()) {
+    if (objectType === 'station') {
+      stations.add(cellKey(x, y));
+    }
+  }
+
+  for (const { id, createdAt, objectType, x, y } of objects.values()) {
+    if (objectType === 'robot' && !hasAdjacentStation(stations, x, y)) {
+      return {
+        valid: false,
+        failure: {
+          reason: 'ROBOT_NOT_ADJACENT_TO_STATION',
+          x,
+          y,
+          ...(id !== undefined && { robotId: id }),
+          ...(createdAt !== undefined && { index: createdAt }),
+        },
+      };
+    }
   }
 
   return { valid: true, operations };

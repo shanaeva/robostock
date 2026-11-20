@@ -41,13 +41,14 @@ describe('objectChangeSchema', () => {
     { type: 'delete', objectType: 'robot', objectId: ID },
     moveObstacle,
     { ...moveObstacle, objectType: 'station' },
+    { ...moveObstacle, objectType: 'robot' },
   ])('accepts a valid operation (%#)', (input) => {
     expect(objectChangeSchema.parse(input)).toEqual(input);
   });
 
-  it('rejects moving a robot', () => {
+  it('rejects moving an unknown object type', () => {
     expect(
-      objectChangeSchema.safeParse({ ...moveObstacle, objectType: 'robot' })
+      objectChangeSchema.safeParse({ ...moveObstacle, objectType: 'wall' })
         .success,
     ).toBe(false);
   });
@@ -240,7 +241,7 @@ describe('batchObjectChangesSchema', () => {
   it('rejects a batch containing one invalid operation', () => {
     expect(
       batchObjectChangesSchema.safeParse({
-        changes: [createObstacle, { ...moveObstacle, objectType: 'robot' }],
+        changes: [createObstacle, { ...moveObstacle, objectType: 'wall' }],
       }).success,
     ).toBe(false);
   });

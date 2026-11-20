@@ -60,11 +60,10 @@ export const deleteObjectChangeSchema = z
   })
   .meta({ id: 'DeleteObjectChange' });
 
-// Robots cannot be moved in the current API scope.
 export const moveObjectChangeSchema = z
   .strictObject({
     type: z.literal('move'),
-    objectType: z.enum(['obstacle', 'station']),
+    objectType: z.enum(['obstacle', 'station', 'robot']),
     objectId: objectIdSchema,
     x: coordinateSchema,
     y: coordinateSchema,
