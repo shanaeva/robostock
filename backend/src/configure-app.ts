@@ -1,8 +1,20 @@
 import type { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
+import type { Environment } from './config/environment.js';
 
 export function configureApp(app: INestApplication): void {
+  app.use(helmet());
   app.enableShutdownHooks();
+
+  const config = app.get<ConfigService<Environment, true>>(ConfigService);
+  const origin = config.get('FRONTEND_ORIGIN', { infer: true });
+
+  app.enableCors({
+    origin: origin ?? 'http://localhost:3000',
+    credentials: true,
+  });
 
   const document = new DocumentBuilder()
     .setTitle('NestJS Starter Kit')

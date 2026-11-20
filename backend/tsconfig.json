@@ -26,7 +26,8 @@
     "src/**/*.ts",
     "test/**/*.ts",
     "vitest*.config.ts",
-    "prisma.config.ts"
+    "prisma.config.ts",
+    "prisma/**/*.ts"
   ],
   "exclude": ["node_modules", "dist", "coverage"]
 }
