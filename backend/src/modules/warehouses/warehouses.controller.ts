@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiHeader,
@@ -83,6 +84,7 @@ export class WarehousesController {
   @ApiOperation({ operationId: 'createWarehouse', summary: 'Создать склад' })
   @ApiCreatedResponse({ standardSchema: warehouseCreatedSchema })
   @ApiBadRequestResponse({ standardSchema: apiErrorSchema })
+  @ApiConflictResponse({ standardSchema: apiErrorSchema })
   create(
     @CurrentOwnerId() ownerId: string,
     @Body({ schema: createWarehouseSchema }) input: CreateWarehouseInput,
@@ -112,6 +114,7 @@ export class WarehousesController {
   @ApiNoContentResponse()
   @ApiBadRequestResponse({ standardSchema: apiErrorSchema })
   @ApiNotFoundResponse({ standardSchema: apiErrorSchema })
+  @ApiConflictResponse({ standardSchema: apiErrorSchema })
   rename(
     @CurrentOwnerId() ownerId: string,
     @Param('id', { schema: warehouseIdSchema }) id: string,

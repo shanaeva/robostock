@@ -1,5 +1,6 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Prisma } from '../../generated/prisma/client.js';
 import { WarehousesService } from './warehouses.service.js';
 
 const ownerId = '22222222-2222-4222-8222-222222222222';
@@ -123,6 +124,19 @@ describe('WarehousesService', () => {
     });
   });
 
+  it('rejects creating a warehouse with a duplicate name', async () => {
+    prisma.warehouse.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Duplicate warehouse name', {
+        code: 'P2002',
+        clientVersion: 'unit-test',
+      }),
+    );
+
+    await expect(
+      service.create(ownerId, { name: warehouse.name, width: 20, height: 10 }),
+    ).rejects.toThrow(ConflictException);
+  });
+
   it('renames an owned warehouse', async () => {
     prisma.warehouse.findFirst.mockResolvedValue(warehouse);
     prisma.warehouse.update.mockResolvedValue(warehouse);
@@ -144,6 +158,20 @@ describe('WarehousesService', () => {
     expect(prisma.warehouse.delete).toHaveBeenCalledWith({
       where: { id: warehouseId },
     });
+  });
+
+  it('rejects renaming a warehouse to a duplicate name', async () => {
+    prisma.warehouse.findFirst.mockResolvedValue(warehouse);
+    prisma.warehouse.update.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Duplicate warehouse name', {
+        code: 'P2002',
+        clientVersion: 'unit-test',
+      }),
+    );
+
+    await expect(
+      service.rename(ownerId, warehouseId, { name: 'Another warehouse' }),
+    ).rejects.toThrow(ConflictException);
   });
 
   it('reports a missing or foreign warehouse as not found', async () => {

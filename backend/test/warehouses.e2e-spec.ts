@@ -166,8 +166,66 @@ describe('Warehouses API with PostgreSQL', () => {
     await agent.get(path).expect(404);
   });
 
-  it('excludes another owner’s warehouse from the list and rejects access to it', async () => {
-    const otherOwner = await prisma.user.create({
+  it('rejects a duplicate warehouse name for the same owner', async () => {
+    const { agent, csrfToken } = ownerSession;
+    const name = 'Main warehouse';
+    const created = await agent
+      .post('/warehouses')
+      .set('X-CSRF-Token', csrfToken)
+      .send({ name, ...dimensions })
+      .expect(201);
+    const { warehouseId } = warehouseCreatedSchema.parse(created.body);
+
+    await agent
+      .post('/warehouses')
+      .set('X-CSRF-Token', csrfToken)
+      .send({ name, ...dimensions })
+      .expect(409, {
+        statusCode: 409,
+        message: 'У вас уже есть склад с таким именем.',
+      });
+
+    await agent.get('/warehouses').expect(200, {
+      list: [{ id: warehouseId, name, ...dimensions }],
+      total: 1,
+      page: 1,
+      limit: 20,
+    });
+  });
+
+  it('rejects renaming a warehouse to an occupied name and preserves its name', async () => {
+    const { agent, csrfToken } = ownerSession;
+    const occupiedName = 'Main warehouse';
+    const originalName = 'Second warehouse';
+
+    await agent
+      .post('/warehouses')
+      .set('X-CSRF-Token', csrfToken)
+      .send({ name: occupiedName, ...dimensions })
+      .expect(201);
+    const created = await agent
+      .post('/warehouses')
+      .set('X-CSRF-Token', csrfToken)
+      .send({ name: originalName, ...dimensions })
+      .expect(201);
+    const { warehouseId } = warehouseCreatedSchema.parse(created.body);
+    const path = `/warehouses/${warehouseId}`;
+
+    await agent
+      .patch(path)
+      .set('X-CSRF-Token', csrfToken)
+      .send({ name: occupiedName })
+      .expect(409, {
+        statusCode: 409,
+        message: 'У вас уже есть склад с таким именем.',
+      });
+
+    const details = await agent.get(path).expect(200);
+    expect(details.body).toMatchObject({ id: warehouseId, name: originalName });
+  });
+
+  it('allows the same name for different owners and isolates their warehouses', async () => {
+    await prisma.user.create({
       data: {
         email: otherOwnerEmail,
         name: 'Other warehouse owner',
@@ -176,30 +234,39 @@ describe('Warehouses API with PostgreSQL', () => {
       },
     });
     const otherSession = await login(otherOwnerEmail);
-    const owned = await prisma.warehouse.create({
-      data: { ownerId, name: 'Own warehouse', ...dimensions },
-    });
-    const foreign = await prisma.warehouse.create({
-      data: { ownerId: otherOwner.id, name: 'Other warehouse', ...dimensions },
-    });
-
     const { agent, csrfToken } = ownerSession;
+    const name = 'Shared name';
+    const owned = await agent
+      .post('/warehouses')
+      .set('X-CSRF-Token', csrfToken)
+      .send({ name, ...dimensions })
+      .expect(201);
+    const foreign = await otherSession.agent
+      .post('/warehouses')
+      .set('X-CSRF-Token', otherSession.csrfToken)
+      .send({ name, ...dimensions })
+      .expect(201);
+    const { warehouseId: ownedId } = warehouseCreatedSchema.parse(owned.body);
+    const { warehouseId: foreignId } = warehouseCreatedSchema.parse(
+      foreign.body,
+    );
+
     const list = await agent.get('/warehouses').expect(200);
     expect(list.body).toEqual({
-      list: [{ id: owned.id, name: owned.name, ...dimensions }],
+      list: [{ id: ownedId, name, ...dimensions }],
       total: 1,
       page: 1,
       limit: 20,
     });
     const otherList = await otherSession.agent.get('/warehouses').expect(200);
     expect(otherList.body).toEqual({
-      list: [{ id: foreign.id, name: foreign.name, ...dimensions }],
+      list: [{ id: foreignId, name, ...dimensions }],
       total: 1,
       page: 1,
       limit: 20,
     });
 
-    const path = `/warehouses/${foreign.id}`;
+    const path = `/warehouses/${foreignId}`;
     const error = { statusCode: 404, message: 'Склад не найден.' };
     await agent.get(path).expect(404, error);
     await agent
@@ -208,8 +275,7 @@ describe('Warehouses API with PostgreSQL', () => {
       .send({ name: 'Renamed warehouse' })
       .expect(404, error);
     await agent.delete(path).set('X-CSRF-Token', csrfToken).expect(404, error);
-    expect(
-      await prisma.warehouse.findUniqueOrThrow({ where: { id: foreign.id } }),
-    ).toEqual(foreign);
+    const details = await otherSession.agent.get(path).expect(200);
+    expect(details.body).toMatchObject({ id: foreignId, name, ...dimensions });
   });
 });

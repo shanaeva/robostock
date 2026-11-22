@@ -1,11 +1,17 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type {
   CreateWarehouseInput,
   ListWarehousesQuery,
   UpdateWarehouseInput,
 } from './warehouses.schemas.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import type { Prisma, Warehouse } from '../../generated/prisma/client.js';
+import { Prisma } from '../../generated/prisma/client.js';
+import type { Warehouse } from '../../generated/prisma/client.js';
 
 const NOT_FOUND = 'Склад не найден.';
 
@@ -36,12 +42,16 @@ export class WarehousesService {
   }
 
   async create(ownerId: string, input: CreateWarehouseInput) {
-    const created = await this.prisma.warehouse.create({
-      data: { ownerId, ...input },
-      select: { id: true },
-    });
+    try {
+      const created = await this.prisma.warehouse.create({
+        data: { ownerId, ...input },
+        select: { id: true },
+      });
 
-    return { warehouseId: created.id };
+      return { warehouseId: created.id };
+    } catch (error) {
+      return this.rethrowWriteError(error);
+    }
   }
 
   async get(ownerId: string, id: string) {
@@ -63,15 +73,30 @@ export class WarehousesService {
 
   async rename(ownerId: string, id: string, input: UpdateWarehouseInput) {
     await this.findOwned(ownerId, id);
-    await this.prisma.warehouse.update({
-      where: { id },
-      data: { name: input.name },
-    });
+    try {
+      await this.prisma.warehouse.update({
+        where: { id },
+        data: { name: input.name },
+      });
+    } catch (error) {
+      this.rethrowWriteError(error);
+    }
   }
 
   async remove(ownerId: string, id: string) {
     await this.findOwned(ownerId, id);
     await this.prisma.warehouse.delete({ where: { id } });
+  }
+
+  private rethrowWriteError(error: unknown): never {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      throw new ConflictException('У вас уже есть склад с таким именем.');
+    }
+
+    throw error;
   }
 
   private async findOwned(ownerId: string, id: string): Promise<Warehouse> {
