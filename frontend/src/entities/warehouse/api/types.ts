@@ -27,6 +27,8 @@ export const defaultWarehouseListParams: WarehouseListParams = {
 
 export type WarehouseDataSource = {
   readonly mode: 'mock' | 'http';
+  // Releases only this screen's mock handlers; no effect on HTTP data.
+  dispose?: () => void;
   list(
     params: WarehouseListParams,
     signal?: AbortSignal,

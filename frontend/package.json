@@ -33,9 +33,15 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
+    "msw": "2.15.0",
     "steiger": "^0.10.0",
     "tailwindcss": "4.3.3",
     "typescript": "^5"
   },
-  "packageManager": "pnpm@12.18.0"
+  "packageManager": "pnpm@12.18.0",
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
+  }
 }

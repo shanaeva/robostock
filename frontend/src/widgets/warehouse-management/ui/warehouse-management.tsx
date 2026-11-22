@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createWarehouseDataSource,
+  getWarehouseBrowserMockRuntime,
   getWarehouseErrorMessage,
   type WarehouseDemoScenario,
 } from '@/entities/warehouse';
@@ -43,6 +44,7 @@ export function WarehouseManagement() {
     try {
       const api = createWarehouseDataSource({
         mode,
+        mockRuntime: getWarehouseBrowserMockRuntime(),
         baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL,
         demoScenario: mode === 'mock' ? readDemoScenario() : undefined,
       });
@@ -52,6 +54,8 @@ export function WarehouseManagement() {
       return { queryClient, api: null, error: getWarehouseErrorMessage(error) };
     }
   });
+
+  useEffect(() => () => services.api?.dispose?.(), [services]);
 
   if (!services.api) {
     return (

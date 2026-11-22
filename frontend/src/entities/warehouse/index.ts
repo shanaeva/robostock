@@ -28,3 +28,4 @@ export {
   WAREHOUSE_DIMENSION_MIN,
   WAREHOUSE_DIMENSION_MAX,
 } from './model/constants';
+export { getWarehouseBrowserMockRuntime } from './api/mocks/browser';

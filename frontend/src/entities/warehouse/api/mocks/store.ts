@@ -1,24 +1,24 @@
-import type { DemoWarehouse } from '../model/types';
-import type { WarehouseDataSource, WarehouseDemoScenario } from './types';
-import { WarehouseApiError } from './errors';
+import type { DemoWarehouse } from '../../model/types';
+import type { WarehouseListParams, WarehouseDemoScenario } from '../types';
+import { WarehouseApiError } from '../errors';
 import {
   warehouseCreateSchema,
   warehouseNameSchema,
-  type WarehouseCreateInput,
-  type WarehouseRenameInput,
-} from '../model/schemas';
-import { warehousesMock } from './mock-data';
+} from '../../model/schemas';
+import { warehousesMock } from '../mock-data';
 
-// Each mounted page owns its own instance. No shared mutable fixture or persistence.
-export function createWarehouseMockApi(
+export const warehouseDemoOwnerError =
+  'Недостаточно прав для этого действия. Доступ разрешён только владельцу склада.';
+
+// Only handlers execute CRUD. The demo layer can read roles and acknowledge invitations.
+export function createWarehouseMockStore(
   scenario: WarehouseDemoScenario = 'default',
-): WarehouseDataSource {
+) {
   let warehouses =
     scenario === 'empty'
       ? []
       : warehousesMock.map((warehouse) => ({ ...warehouse }));
   let failNextList = scenario === 'error';
-  const wait = () => new Promise<void>((resolve) => setTimeout(resolve, 450));
 
   function checkMutation() {
     if (scenario === 'mutation-error') {
@@ -37,20 +37,14 @@ export function createWarehouseMockApi(
     }
 
     if (scenario === 'forbidden' || warehouse.currentUserRole !== 'Owner') {
-      throw new WarehouseApiError(
-        403,
-        'Недостаточно прав для этого действия. Доступ разрешён только владельцу склада.',
-      );
+      throw new WarehouseApiError(403, warehouseDemoOwnerError);
     }
 
     return warehouse;
   }
 
   return {
-    mode: 'mock',
-    async list(params) {
-      await wait();
-
+    list(params: WarehouseListParams) {
       if (failNextList) {
         failNextList = false;
         throw new WarehouseApiError(
@@ -88,10 +82,7 @@ export function createWarehouseMockApi(
         limit: params.limit,
       };
     },
-    async create(
-      input: WarehouseCreateInput,
-    ): Promise<{ warehouseId: string }> {
-      await wait();
+    create(input: unknown): { warehouseId: string } {
       checkMutation();
       const parsed = warehouseCreateSchema.safeParse(input);
 
@@ -109,8 +100,7 @@ export function createWarehouseMockApi(
 
       return { warehouseId };
     },
-    async rename(id: string, input: WarehouseRenameInput): Promise<void> {
-      await wait();
+    rename(id: string, input: unknown): void {
       const warehouse = requireOwner(id);
       checkMutation();
       const parsed = warehouseNameSchema.safeParse(input);
@@ -123,14 +113,16 @@ export function createWarehouseMockApi(
         warehouse.id === id ? renamed : warehouse,
       );
     },
-    async remove(id: string): Promise<void> {
-      await wait();
+    remove(id: string): void {
       requireOwner(id);
       checkMutation();
       warehouses = warehouses.filter((warehouse) => warehouse.id !== id);
     },
-    async invite(id: string, email: string) {
-      await wait();
+    getRole(id: string) {
+      return warehouses.find((warehouse) => warehouse.id === id)
+        ?.currentUserRole;
+    },
+    invite(id: string, email: string) {
       requireOwner(id);
       checkMutation();
 
