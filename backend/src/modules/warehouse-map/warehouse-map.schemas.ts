@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 // Structural validation only. Map bounds (0..width-1 / 0..height-1), cell
 // occupancy, ownership and object existence are checked by the service layer.
+export const warehouseIdSchema = z.uuid();
+
 const objectIdSchema = z.uuid();
 
 const nameSchema = z.string().trim().min(1).max(100);
