@@ -103,6 +103,11 @@ jobs:
     env:
       DATABASE_URL: postgresql://starter:starter_local_only@localhost:5432/robostock
       TEST_DATABASE_ADMIN_URL: postgresql://starter:starter_local_only@localhost:5432/postgres
+      JWT_SECRET: ci-test-jwt-secret-at-least-32-characters-long
+      AUTH_CODE_SECRET: ci-test-auth-code-secret-32-characters-ok
+      CSRF_SECRET: ci-test-csrf-secret-at-least-32-characters
+      AUTH_RATE_LIMIT_ENABLED: 'false'
+      AUTH_EMAIL_ENABLED: 'false'
 
     steps:
       - name: Checkout

@@ -45,6 +45,7 @@ describe('user schemas', () => {
       id: 'b8ce249d-8a13-4bd0-8f19-acac66c7464e',
       email: 'test@example.com',
       name: 'Alex',
+      role: 'USER' as const,
       createdAt: '2026-11-10T09:00:00.000Z',
     };
     expect(userResponseSchema.parse(user)).toEqual(user);

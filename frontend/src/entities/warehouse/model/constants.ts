@@ -1,0 +1,4 @@
+export const WAREHOUSE_NAME_MIN_LENGTH = 1;
+export const WAREHOUSE_NAME_MAX_LENGTH = 100;
+export const WAREHOUSE_DIMENSION_MIN = 1;
+export const WAREHOUSE_DIMENSION_MAX = 500;
