@@ -138,30 +138,27 @@ describe('WarehousesService', () => {
   });
 
   it('renames an owned warehouse', async () => {
-    prisma.warehouse.findFirst.mockResolvedValue(warehouse);
     prisma.warehouse.update.mockResolvedValue(warehouse);
 
     await service.rename(ownerId, warehouseId, { name: 'Renamed warehouse' });
 
     expect(prisma.warehouse.update).toHaveBeenCalledWith({
-      where: { id: warehouseId },
+      where: { id: warehouseId, ownerId },
       data: { name: 'Renamed warehouse' },
     });
   });
 
   it('deletes an owned warehouse', async () => {
-    prisma.warehouse.findFirst.mockResolvedValue(warehouse);
     prisma.warehouse.delete.mockResolvedValue(warehouse);
 
     await service.remove(ownerId, warehouseId);
 
     expect(prisma.warehouse.delete).toHaveBeenCalledWith({
-      where: { id: warehouseId },
+      where: { id: warehouseId, ownerId },
     });
   });
 
   it('rejects renaming a warehouse to a duplicate name', async () => {
-    prisma.warehouse.findFirst.mockResolvedValue(warehouse);
     prisma.warehouse.update.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('Duplicate warehouse name', {
         code: 'P2002',
@@ -185,21 +182,32 @@ describe('WarehousesService', () => {
     });
   });
 
-  it('does not rename a missing or foreign warehouse', async () => {
-    prisma.warehouse.findFirst.mockResolvedValue(null);
+  it('reports a missing or foreign warehouse as not found on rename', async () => {
+    prisma.warehouse.update.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Warehouse record not found', {
+        code: 'P2025',
+        clientVersion: 'unit-test',
+      }),
+    );
 
     await expect(
       service.rename(ownerId, warehouseId, { name: 'Renamed warehouse' }),
-    ).rejects.toThrow(NotFoundException);
-    expect(prisma.warehouse.update).not.toHaveBeenCalled();
+    ).rejects.toMatchObject({ status: 404, message: 'Склад не найден.' });
+    expect(prisma.warehouse.findFirst).not.toHaveBeenCalled();
   });
 
-  it('does not delete a missing or foreign warehouse', async () => {
-    prisma.warehouse.findFirst.mockResolvedValue(null);
-
-    await expect(service.remove(ownerId, warehouseId)).rejects.toThrow(
-      NotFoundException,
+  it('reports a missing or foreign warehouse as not found on delete', async () => {
+    prisma.warehouse.delete.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Warehouse record not found', {
+        code: 'P2025',
+        clientVersion: 'unit-test',
+      }),
     );
-    expect(prisma.warehouse.delete).not.toHaveBeenCalled();
+
+    await expect(service.remove(ownerId, warehouseId)).rejects.toMatchObject({
+      status: 404,
+      message: 'Склад не найден.',
+    });
+    expect(prisma.warehouse.findFirst).not.toHaveBeenCalled();
   });
 });

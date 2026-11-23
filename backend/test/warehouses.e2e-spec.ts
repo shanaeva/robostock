@@ -12,6 +12,7 @@ import {
   expect,
   inject,
   it,
+  vi,
 } from 'vitest';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/configure-app.js';
@@ -165,6 +166,68 @@ describe('Warehouses API with PostgreSQL', () => {
     ).toBeNull();
     await agent.get(path).expect(404);
   });
+
+  it.each(['patch', 'delete'] as const)(
+    'returns 404 when a concurrent delete wins against %s',
+    async (method) => {
+      const { agent, csrfToken } = ownerSession;
+      const { id } = await prisma.warehouse.create({
+        data: { ownerId, name: 'Main warehouse', ...dimensions },
+        select: { id: true },
+      });
+      const path = `/warehouses/${id}`;
+
+      const write = agent[method](path).set('X-CSRF-Token', csrfToken);
+
+      if (method === 'patch') {
+        write.send({ name: 'Renamed warehouse' });
+      }
+
+      const waitForBlockedRequests = (count: number) =>
+        vi.waitFor(
+          async () => {
+            const blocked = await prisma.$queryRaw<{ pid: number }[]>`
+            SELECT pid FROM pg_stat_activity
+            WHERE datname = current_database() AND wait_event_type = 'Lock'
+          `;
+            expect(blocked).toHaveLength(count);
+          },
+          { timeout: 2000 },
+        );
+
+      const responses: Promise<unknown>[] = [];
+      await prisma.$transaction(async (tx) => {
+        // Queue both writes on the row lock, with DELETE first.
+        await tx.$queryRaw`
+          SELECT id FROM warehouses WHERE id = ${id}::uuid FOR UPDATE
+        `;
+
+        responses.push(
+          agent
+            .delete(path)
+            .set('X-CSRF-Token', csrfToken)
+            .then(
+              (response) => response,
+              (error: unknown) => error,
+            ),
+        );
+        await waitForBlockedRequests(1);
+
+        responses.push(
+          write.then(
+            (response) => response,
+            (error: unknown) => error,
+          ),
+        );
+        await waitForBlockedRequests(2);
+      });
+
+      await expect(Promise.all(responses)).resolves.toMatchObject([
+        { status: 204, text: '' },
+        { status: 404, body: { statusCode: 404, message: 'Склад не найден.' } },
+      ]);
+    },
+  );
 
   it('rejects a duplicate warehouse name for the same owner', async () => {
     const { agent, csrfToken } = ownerSession;

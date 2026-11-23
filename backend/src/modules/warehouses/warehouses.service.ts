@@ -72,20 +72,33 @@ export class WarehousesService {
   }
 
   async rename(ownerId: string, id: string, input: UpdateWarehouseInput) {
-    await this.findOwned(ownerId, id);
     try {
       await this.prisma.warehouse.update({
-        where: { id },
+        where: { id, ownerId },
         data: { name: input.name },
       });
     } catch (error) {
-      this.rethrowWriteError(error);
+      this.rethrowOwnedWriteError(error);
     }
   }
 
   async remove(ownerId: string, id: string) {
-    await this.findOwned(ownerId, id);
-    await this.prisma.warehouse.delete({ where: { id } });
+    try {
+      await this.prisma.warehouse.delete({ where: { id, ownerId } });
+    } catch (error) {
+      this.rethrowOwnedWriteError(error);
+    }
+  }
+
+  private rethrowOwnedWriteError(error: unknown): never {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2025'
+    ) {
+      throw new NotFoundException(NOT_FOUND);
+    }
+
+    return this.rethrowWriteError(error);
   }
 
   private rethrowWriteError(error: unknown): never {
