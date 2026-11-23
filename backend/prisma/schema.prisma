@@ -32,6 +32,8 @@ model User {
   sessions Session[]
   codes    EmailCode[]
 
+  warehouses Warehouse[]
+
   @@index([createdAt(sort: Desc), id(sort: Desc)])
   @@map("users")
 }
@@ -78,4 +80,18 @@ model EmailCode {
 
   @@unique([userId, purpose])
   @@map("email_codes")
+}
+
+model Warehouse {
+  id        String   @id @default(uuid()) @db.Uuid
+  ownerId   String   @db.Uuid
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name      String   @db.VarChar(100)
+  width     Int
+  height    Int
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([ownerId, name])
+  @@map("warehouses")
 }
