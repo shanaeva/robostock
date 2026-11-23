@@ -4,9 +4,6 @@ import type {
 } from '../model/schemas';
 import type { WarehouseListResult, WarehouseRole } from '../model/types';
 
-export type WarehouseDemoScenario =
-  'default' | 'empty' | 'error' | 'mutation-error' | 'forbidden';
-
 export type WarehouseListParams = {
   search: string;
   page: number;
@@ -27,8 +24,6 @@ export const defaultWarehouseListParams: WarehouseListParams = {
 
 export type WarehouseDataSource = {
   readonly mode: 'mock' | 'http';
-  // Releases only this screen's mock handlers; no effect on HTTP data.
-  dispose?: () => void;
   list(
     params: WarehouseListParams,
     signal?: AbortSignal,
