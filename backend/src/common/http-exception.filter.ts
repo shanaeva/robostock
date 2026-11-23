@@ -14,29 +14,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const status =
       exception instanceof HttpException ? exception.getStatus() : 500;
-    let message =
-      status === 503 ? 'Service unavailable' : 'Internal server error';
-
-    if (exception instanceof HttpException && status < 500) {
-      const response = exception.getResponse();
-      const details: unknown =
-        typeof response === 'string'
-          ? response
-          : 'message' in response
-            ? response.message
-            : exception.message;
-
-      message =
-        typeof details === 'string'
-          ? details
-          : Array.isArray(details)
-            ? details
-                .filter(
-                  (item: unknown): item is string => typeof item === 'string',
-                )
-                .join('; ') || exception.message
-            : exception.message;
-    }
+    const message = this.resolveMessage(exception, status);
 
     if (status >= 500) {
       // Keep stack locations for debugging without logging error messages or SQL.
@@ -56,5 +34,45 @@ export class HttpExceptionFilter implements ExceptionFilter {
       body,
       status,
     );
+  }
+
+  private resolveMessage(exception: unknown, status: number): string {
+    if (status === 503) {
+      return 'Service unavailable';
+    }
+
+    if (!(exception instanceof HttpException) || status >= 500) {
+      return 'Internal server error';
+    }
+
+    if (status === 400) {
+      return 'Некорректный JSON, параметры запроса или структура changes.';
+    }
+
+    const response = exception.getResponse();
+
+    if (typeof response === 'string') {
+      return response;
+    }
+
+    if (!('message' in response)) {
+      return exception.message;
+    }
+
+    const details: unknown = response.message;
+
+    if (typeof details === 'string') {
+      return details;
+    }
+
+    if (Array.isArray(details)) {
+      const message = details
+        .filter((item: unknown): item is string => typeof item === 'string')
+        .join('; ');
+
+      return message || exception.message;
+    }
+
+    return exception.message;
   }
 }
