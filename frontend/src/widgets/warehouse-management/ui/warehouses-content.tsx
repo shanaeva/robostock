@@ -15,6 +15,7 @@ import {
   getWarehouseErrorMessage,
   defaultWarehouseListParams,
   useWarehouses,
+  warehouseMocksEnabled,
   type WarehouseDataSource,
   type WarehouseListParams,
 } from '@/entities/warehouse';
@@ -40,7 +41,7 @@ export function WarehousesContent({ api }: { api: WarehouseDataSource }) {
   const createButton = useRef<HTMLButtonElement | null>(null);
   const warehouses = query.data?.list ?? [];
   const hasFilters = Boolean(params.search.trim() || params.role);
-  const demoOwner = isWarehouseDemoOwner(api.mode);
+  const demoOwner = !warehouseMocksEnabled && isWarehouseDemoOwner(api.mode);
 
   function openAction(
     nextAction: WarehouseAction,
@@ -201,8 +202,8 @@ export function WarehousesContent({ api }: { api: WarehouseDataSource }) {
         {!demoOwner && (
           <p className="flex items-start gap-2 text-xs leading-5 text-slate-500">
             <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            {api.mode === 'mock'
-              ? 'Демо-данные: изменения сбросятся после перезагрузки'
+            {warehouseMocksEnabled
+              ? 'MSW возвращает готовый список. Поиск и изменения складов на него не влияют.'
               : 'Сведения о правах пока недоступны. Изменение, удаление и приглашения отключены.'}
           </p>
         )}

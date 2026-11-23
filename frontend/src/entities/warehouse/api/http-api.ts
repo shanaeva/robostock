@@ -6,16 +6,9 @@ import {
   warehouseErrorSchema,
 } from '../model/api-contract';
 import { WarehouseApiError, getHttpErrorMessage } from './errors';
-import type { WarehouseDataSource, WarehouseListParams } from './types';
+import type { WarehouseDataSource } from './types';
 
-export function createWarehouseHttpApi(
-  baseUrl?: string,
-  options: {
-    beforeRequest?: () => Promise<void>;
-    listHeaders?: (params: WarehouseListParams) => HeadersInit;
-    errorMessage?: (status: number) => string | undefined;
-  } = {},
-): WarehouseDataSource {
+export function createWarehouseHttpApi(baseUrl?: string): WarehouseDataSource {
   const client = createHttpClient(baseUrl);
   // Resolve lazily so a missing setting appears in the existing error UI,
   // rather than crashing Next.js prerendering or silently selecting mocks.
@@ -37,8 +30,6 @@ export function createWarehouseHttpApi(
   }
 
   async function request(url: URL, init: RequestInit = {}) {
-    await options.beforeRequest?.();
-
     let response: Response;
     try {
       response = await client.request(url, init);
@@ -70,8 +61,7 @@ export function createWarehouseHttpApi(
         response.status,
         useServerMessage
           ? parsed.data.message
-          : (options.errorMessage?.(response.status) ??
-              getHttpErrorMessage(response.status)),
+          : getHttpErrorMessage(response.status),
       );
     }
 
@@ -112,13 +102,7 @@ export function createWarehouseHttpApi(
       url.searchParams.set('limit', String(params.limit));
       url.searchParams.set('sortBy', params.sortBy);
       url.searchParams.set('sortOrder', params.sortOrder);
-      const response = await request(url, {
-        method: 'GET',
-        signal,
-        ...(options.listHeaders
-          ? { headers: options.listHeaders(params) }
-          : {}),
-      });
+      const response = await request(url, { method: 'GET', signal });
 
       // Zod strips unknown fields, including any uncontracted currentUserRole.
       return readJson(response, warehouseListSchema);

@@ -7,10 +7,6 @@ export type Warehouse = WarehouseSummary & {
   currentUserRole?: WarehouseRole;
 };
 
-export type DemoWarehouse = WarehouseSummary & {
-  currentUserRole: WarehouseRole;
-};
-
 export type WarehouseListResult = Omit<WarehouseListDto, 'list'> & {
   list: Warehouse[];
 };
