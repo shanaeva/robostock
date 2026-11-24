@@ -1,4 +1,6 @@
+import { ServiceUnavailableException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Prisma } from '../../generated/prisma/client.js';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import { PrismaWarehouseMapStorage } from './warehouse-map.storage.js';
 import type { WarehouseMapTransaction } from './warehouse-map.service.js';
@@ -19,6 +21,7 @@ function delegate() {
 describe('PrismaWarehouseMapStorage', () => {
   const calls: string[] = [];
   const tx = {
+    $executeRaw: vi.fn(),
     $queryRaw: vi.fn(),
     warehouse: { update: vi.fn() },
     obstacle: delegate(),
@@ -33,10 +36,9 @@ describe('PrismaWarehouseMapStorage', () => {
 
   beforeEach(() => {
     calls.length = 0;
+    tx.$executeRaw.mockReset();
     tx.$queryRaw.mockReset();
-    tx.$queryRaw.mockResolvedValue([
-      { ownerId: OWNER_ID, width: 20, height: 20 },
-    ]);
+    tx.$queryRaw.mockResolvedValue([{ width: 20, height: 20 }]);
     tx.warehouse.update.mockReset();
     for (const model of [tx.obstacle, tx.station, tx.robot]) {
       model.findMany.mockReset().mockResolvedValue([]);
@@ -64,7 +66,7 @@ describe('PrismaWarehouseMapStorage', () => {
   });
 
   it('locks the warehouse row with a parameterized query', async () => {
-    await run((t) => t.loadWarehouseMap(WAREHOUSE_ID));
+    await run((t) => t.loadWarehouseMap(WAREHOUSE_ID, OWNER_ID));
 
     const [strings, ...values] = tx.$queryRaw.mock.calls[0] as [
       TemplateStringsArray,
@@ -72,14 +74,25 @@ describe('PrismaWarehouseMapStorage', () => {
     ];
     expect(strings.join('?')).toMatch(/FOR NO KEY UPDATE/);
     expect(strings.join('?')).not.toContain(WAREHOUSE_ID);
-    expect(values).toEqual([WAREHOUSE_ID]);
+    expect(strings.join('?')).toContain('"ownerId" = ?::uuid');
+    expect(values).toEqual([WAREHOUSE_ID, OWNER_ID]);
+  });
+
+  it('limits the lock wait before locking', async () => {
+    await run((t) => t.loadWarehouseMap(WAREHOUSE_ID, OWNER_ID));
+
+    const [strings] = tx.$executeRaw.mock.calls[0] as [TemplateStringsArray];
+    expect(strings.join('')).toBe("SET LOCAL lock_timeout = '3s'");
+    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.$queryRaw.mock.invocationCallOrder[0] ?? 0,
+    );
   });
 
   it('returns null without loading objects for an unknown warehouse', async () => {
     tx.$queryRaw.mockResolvedValue([]);
 
     await expect(
-      run((t) => t.loadWarehouseMap(WAREHOUSE_ID)),
+      run((t) => t.loadWarehouseMap(WAREHOUSE_ID, OWNER_ID)),
     ).resolves.toBeNull();
     expect(tx.obstacle.findMany).not.toHaveBeenCalled();
   });
@@ -88,7 +101,7 @@ describe('PrismaWarehouseMapStorage', () => {
     tx.$queryRaw.mockImplementation(() => {
       calls.push('lock');
 
-      return Promise.resolve([{ ownerId: OWNER_ID, width: 20, height: 10 }]);
+      return Promise.resolve([{ width: 20, height: 10 }]);
     });
     for (const model of [tx.obstacle, tx.station, tx.robot]) {
       model.findMany.mockImplementation(() => {
@@ -105,11 +118,10 @@ describe('PrismaWarehouseMapStorage', () => {
     tx.station.findMany.mockResolvedValueOnce([{ id: 's', x: 3, y: 4 }]);
     tx.robot.findMany.mockResolvedValueOnce([{ id: 'r', x: 3, y: 5 }]);
 
-    const map = await run((t) => t.loadWarehouseMap(WAREHOUSE_ID));
+    const map = await run((t) => t.loadWarehouseMap(WAREHOUSE_ID, OWNER_ID));
 
     expect(calls[0]).toBe('lock');
     expect(map).toEqual({
-      ownerId: OWNER_ID,
       width: 20,
       height: 10,
       objects: [
@@ -157,7 +169,19 @@ describe('PrismaWarehouseMapStorage', () => {
     });
   });
 
-  it.each(['obstacle', 'station', 'robot'] as const)(
+  it('deletes a robot scoped by warehouse id', async () => {
+    await run((t) =>
+      t.applyOperations(WAREHOUSE_ID, [
+        { type: 'delete', objectType: 'robot', objectId: OBJECT_ID },
+      ]),
+    );
+
+    expect(tx.robot.deleteMany).toHaveBeenCalledWith({
+      where: { id: OBJECT_ID, warehouseId: WAREHOUSE_ID },
+    });
+  });
+
+  it.each(['obstacle', 'station'] as const)(
     'moves and deletes a %s scoped by warehouse id',
     async (objectType) => {
       await run((t) =>
@@ -188,7 +212,7 @@ describe('PrismaWarehouseMapStorage', () => {
 
       return Promise.resolve({});
     });
-    tx.robot.updateMany.mockImplementation(() => {
+    tx.station.updateMany.mockImplementation(() => {
       calls.push('move');
 
       return Promise.resolve({ count: 1 });
@@ -200,7 +224,7 @@ describe('PrismaWarehouseMapStorage', () => {
         { type: 'create', objectType: 'robot', name: 'R', x: 1, y: 1 },
         {
           type: 'move',
-          objectType: 'robot',
+          objectType: 'station',
           objectId: OBJECT_ID,
           x: 2,
           y: 2,
@@ -214,18 +238,18 @@ describe('PrismaWarehouseMapStorage', () => {
   it.each([
     [
       'move',
-      { type: 'move', objectType: 'robot', objectId: OBJECT_ID, x: 1, y: 1 },
+      { type: 'move', objectType: 'station', objectId: OBJECT_ID, x: 1, y: 1 },
       'updateMany',
     ],
     [
       'delete',
-      { type: 'delete', objectType: 'robot', objectId: OBJECT_ID },
+      { type: 'delete', objectType: 'station', objectId: OBJECT_ID },
       'deleteMany',
     ],
   ] as const)(
     'aborts the batch when a %s affects no row',
     async (_name, operation, method) => {
-      tx.robot[method].mockResolvedValue({ count: 0 });
+      tx.station[method].mockResolvedValue({ count: 0 });
 
       await expect(
         run((t) => t.applyOperations(WAREHOUSE_ID, [operation])),
@@ -240,6 +264,34 @@ describe('PrismaWarehouseMapStorage', () => {
       where: { id: WAREHOUSE_ID },
       data: { updatedAt: expect.any(Date) as Date },
     });
+  });
+
+  it.each([
+    ['an expired or unavailable transaction', 'P2028', undefined],
+    ['a lock timeout', 'P2010', '55P03'],
+  ])('reports %s as 503', async (_name, code, originalCode) => {
+    $transaction.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('busy', {
+        code,
+        clientVersion: 'unit-test',
+        meta: { driverAdapterError: { cause: { originalCode } } },
+      }),
+    );
+
+    await expect(run(() => Promise.resolve())).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+  });
+
+  it('does not disguise other database errors as 503', async () => {
+    const failure = new Prisma.PrismaClientKnownRequestError('syntax error', {
+      code: 'P2010',
+      clientVersion: 'unit-test',
+      meta: { driverAdapterError: { cause: { originalCode: '42601' } } },
+    });
+    $transaction.mockRejectedValue(failure);
+
+    await expect(run(() => Promise.resolve())).rejects.toBe(failure);
   });
 
   it('propagates work failures so Prisma rolls the transaction back', async () => {

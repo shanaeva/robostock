@@ -33,6 +33,11 @@ describe('WarehousesService', () => {
   let prisma: ReturnType<typeof createPrismaMock>;
   let service: WarehousesService;
 
+  const runInteractively = () =>
+    prisma.$transaction.mockImplementation(
+      (work: (tx: typeof prisma) => unknown) => work(prisma),
+    );
+
   beforeEach(() => {
     prisma = createPrismaMock();
     service = new WarehousesService(prisma as never);
@@ -111,16 +116,54 @@ describe('WarehousesService', () => {
     });
   });
 
-  it('returns warehouse details with empty object collections', async () => {
-    prisma.warehouse.findFirst.mockResolvedValue(warehouse);
+  it.each([
+    ['empty', { robots: [], obstacles: [], stations: [] }],
+    [
+      'persisted',
+      {
+        robots: [{ id: ownerId, name: 'R', x: 3, y: 5 }],
+        obstacles: [{ id: ownerId, x: 0, y: 1 }],
+        stations: [{ id: ownerId, name: 'S', x: 3, y: 4, direction: 'north' }],
+      },
+    ],
+  ])('returns details with %s object collections', async (_name, objects) => {
+    runInteractively();
+    prisma.warehouse.findFirst.mockResolvedValue({ ...warehouse, ...objects });
 
     await expect(service.get(ownerId, warehouseId)).resolves.toEqual({
+      ...warehouse,
+      ...objects,
+      createdAt: '2026-11-14T09:00:00.000Z',
+      updatedAt: '2026-11-14T09:10:00.000Z',
+    });
+  });
+
+  it('reads the owned warehouse and its map from one snapshot', async () => {
+    runInteractively();
+    prisma.warehouse.findFirst.mockResolvedValue({
       ...warehouse,
       robots: [],
       obstacles: [],
       stations: [],
-      createdAt: '2026-11-14T09:00:00.000Z',
-      updatedAt: '2026-11-14T09:10:00.000Z',
+    });
+
+    await service.get(ownerId, warehouseId);
+
+    expect(prisma.$transaction).toHaveBeenCalledExactlyOnceWith(
+      expect.any(Function),
+      { isolationLevel: 'RepeatableRead' },
+    );
+    const orderBy = [{ createdAt: 'asc' }, { id: 'asc' }];
+    expect(prisma.warehouse.findFirst).toHaveBeenCalledWith({
+      where: { id: warehouseId, ownerId },
+      include: {
+        robots: { select: { id: true, name: true, x: true, y: true }, orderBy },
+        obstacles: { select: { id: true, x: true, y: true }, orderBy },
+        stations: {
+          select: { id: true, name: true, x: true, y: true, direction: true },
+          orderBy,
+        },
+      },
     });
   });
 
@@ -172,14 +215,15 @@ describe('WarehousesService', () => {
   });
 
   it('reports a missing or foreign warehouse as not found', async () => {
+    runInteractively();
     prisma.warehouse.findFirst.mockResolvedValue(null);
 
     await expect(service.get(ownerId, warehouseId)).rejects.toThrow(
       NotFoundException,
     );
-    expect(prisma.warehouse.findFirst).toHaveBeenCalledWith({
-      where: { id: warehouseId, ownerId },
-    });
+    expect(prisma.warehouse.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: warehouseId, ownerId } }),
+    );
   });
 
   it('reports a missing or foreign warehouse as not found on rename', async () => {

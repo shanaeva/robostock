@@ -6,7 +6,13 @@ export const warehouseIdSchema = z.uuid();
 
 const objectIdSchema = z.uuid();
 
-const nameSchema = z.string().trim().min(1).max(100);
+// PostgreSQL text cannot store NUL characters.
+const nameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(100)
+  .refine((name) => !name.includes('\0'));
 
 // Intentionally no .min()/.max(): out-of-map integers (including negative
 // ones) must reach the service so it can answer 422 instead of 400.
@@ -65,7 +71,7 @@ export const deleteObjectChangeSchema = z
 export const moveObjectChangeSchema = z
   .strictObject({
     type: z.literal('move'),
-    objectType: z.enum(['obstacle', 'station', 'robot']),
+    objectType: z.enum(['obstacle', 'station']),
     objectId: objectIdSchema,
     x: coordinateSchema,
     y: coordinateSchema,

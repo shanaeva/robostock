@@ -1,5 +1,4 @@
 import {
-  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -13,12 +12,11 @@ import {
   type WarehouseMapState,
 } from './warehouse-map.validator.js';
 
-export interface WarehouseMapRecord extends WarehouseMapState {
-  ownerId: string;
-}
-
 export interface WarehouseMapTransaction {
-  loadWarehouseMap(warehouseId: string): Promise<WarehouseMapRecord | null>;
+  loadWarehouseMap(
+    warehouseId: string,
+    ownerId: string,
+  ): Promise<WarehouseMapState | null>;
   applyOperations(
     warehouseId: string,
     operations: readonly ObjectChange[],
@@ -38,6 +36,8 @@ const operationFailureMessages: Record<OperationFailureReason, string> = {
   NOT_FOUND: 'Map object not found',
   OUT_OF_BOUNDS: 'Coordinates are outside the map',
   CELL_OCCUPIED: 'Cell is already occupied',
+  STATION_HAS_ADJACENT_ROBOT:
+    'Station cannot be deleted while a robot is adjacent to it',
 };
 
 function toHttpException(failure: ValidationFailure): Error {
@@ -66,18 +66,15 @@ export class WarehouseMapService {
 
   applyChanges(
     warehouseId: string,
-    userId: string,
+    ownerId: string,
     changes: readonly ObjectChange[],
   ): Promise<void> {
     return this.storage.runInTransaction(async (transaction) => {
-      const map = await transaction.loadWarehouseMap(warehouseId);
+      const map = await transaction.loadWarehouseMap(warehouseId, ownerId);
 
       if (!map) {
-        throw new NotFoundException('Warehouse not found');
-      }
-
-      if (map.ownerId !== userId) {
-        throw new ForbiddenException('Warehouse belongs to another user');
+        // Same answer as Warehouse Management for missing and foreign ids.
+        throw new NotFoundException('Склад не найден.');
       }
 
       const result = validateObjectChanges(map, changes);

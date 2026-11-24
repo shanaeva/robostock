@@ -15,6 +15,7 @@ import {
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/configure-app.js';
 import { hashPassword } from '../src/modules/auth/auth.crypto.js';
+import { warehouseDetailsSchema } from '../src/modules/warehouses/warehouses.schemas.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 
 describe('Warehouse map API with PostgreSQL', () => {
@@ -65,14 +66,19 @@ describe('Warehouse map API with PostgreSQL', () => {
 
   const obstacle = (x: number, y: number) =>
     ({ type: 'create', objectType: 'obstacle', x, y }) as const;
-  const station = (x: number, y: number, name = 'Station') =>
+  const station = (
+    x: number,
+    y: number,
+    name = 'Station',
+    direction: 'north' | 'south' | 'east' | 'west' = 'north',
+  ) =>
     ({
       type: 'create',
       objectType: 'station',
       name,
       x,
       y,
-      direction: 'north',
+      direction,
     }) as const;
   const robot = (x: number, y: number, name = 'Robot') =>
     ({ type: 'create', objectType: 'robot', name, x, y }) as const;
@@ -99,6 +105,13 @@ describe('Warehouse map API with PostgreSQL', () => {
 
     return counts.reduce((sum, count) => sum + count, 0);
   };
+  // Validates the response against the published contract.
+  const getMap = async (id = warehouseId) => {
+    const response = await owner.agent.get(`/warehouses/${id}`).expect(200);
+
+    return warehouseDetailsSchema.parse(response.body);
+  };
+  const notFound = { statusCode: 404, message: 'Склад не найден.' };
   const updatedAt = async () =>
     (
       await prisma.warehouse.findUniqueOrThrow({
@@ -174,22 +187,139 @@ describe('Warehouse map API with PostgreSQL', () => {
       expect(await objectsAt(1, 1)).toBe(0);
     });
 
-    it("returns 403 for another user's warehouse and changes nothing", async () => {
+    it('rejects an invalid CSRF token and an invalid session', async () => {
+      const path = `/warehouses/${warehouseId}/objects`;
+      await owner.agent
+        .patch(path)
+        .set('X-CSRF-Token', 'forged')
+        .send({ changes: [obstacle(1, 1)] })
+        .expect(403);
+      await request(server)
+        .patch(path)
+        .set('Cookie', [`csrf_token=${owner.csrfToken}`, 'access_token=forged'])
+        .set('X-CSRF-Token', owner.csrfToken)
+        .send({ changes: [obstacle(1, 1)] })
+        .expect(401);
+      await request(server).get(`/warehouses/${warehouseId}`).expect(401);
+      expect(await objectsAt(1, 1)).toBe(0);
+    });
+
+    it('answers identically for foreign and unknown warehouses', async () => {
       const other = await login(otherEmail);
       const before = await updatedAt();
+      const unknownId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 
-      await patchMap(other, [obstacle(1, 1)]).expect(403);
+      for (const id of [warehouseId, unknownId]) {
+        await patchMap(other, [obstacle(1, 1)], id).expect(404, notFound);
+        await other.agent.get(`/warehouses/${id}`).expect(404, notFound);
+      }
 
       expect(await objectsAt(1, 1)).toBe(0);
       expect(await updatedAt()).toBe(before);
     });
 
-    it('returns 404 for an unknown warehouse', async () => {
+    it("does not wait for a lock on another user's warehouse", async () => {
+      const other = await login(otherEmail);
+
+      await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`
+          SELECT id FROM warehouses WHERE id = ${warehouseId}::uuid FOR UPDATE
+        `;
+        const started = Date.now();
+        await patchMap(other, [obstacle(1, 1)]).expect(404, notFound);
+        // Well below the 3 s lock timeout.
+        expect(Date.now() - started).toBeLessThan(1500);
+      });
+    });
+  });
+
+  describe('editor workflow', () => {
+    it('creates, reads, moves and deletes objects using ids from GET', async () => {
+      const created = await owner.agent
+        .post('/warehouses')
+        .set('X-CSRF-Token', owner.csrfToken)
+        .send({ name: 'Workflow warehouse', width: 30, height: 15 })
+        .expect(201);
+      const { warehouseId: id } = created.body as { warehouseId: string };
+      expect(await getMap(id)).toMatchObject(empty);
+
       await patchMap(
         owner,
-        [obstacle(1, 1)],
-        'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
-      ).expect(404);
+        [obstacle(29, 14), station(5, 5, 'Charger'), robot(5, 6, 'R-1')],
+        id,
+      ).expect(204, '');
+
+      const map = await getMap(id);
+      const [o, s, r] = [map.obstacles[0], map.stations[0], map.robots[0]];
+
+      if (!o || !s || !r) {
+        throw new Error('GET did not return the created objects');
+      }
+      expect(map).toMatchObject({ id, ownerId, width: 30, height: 15 });
+      // Exact equality: no internal columns may leak into the response.
+      expect(map.obstacles).toEqual([{ id: o.id, x: 29, y: 14 }]);
+      expect(map.stations).toEqual([
+        { id: s.id, name: 'Charger', x: 5, y: 5, direction: 'north' },
+      ]);
+      expect(map.robots).toEqual([{ id: r.id, name: 'R-1', x: 5, y: 6 }]);
+
+      await patchMap(
+        owner,
+        [
+          { type: 'move', objectType: 'obstacle', objectId: o.id, x: 2, y: 3 },
+          { type: 'move', objectType: 'station', objectId: s.id, x: 4, y: 6 },
+        ],
+        id,
+      ).expect(204);
+      const moved = await getMap(id);
+      expect(moved.obstacles).toEqual([{ id: o.id, x: 2, y: 3 }]);
+      expect(moved.stations).toMatchObject([{ id: s.id, x: 4, y: 6 }]);
+      expect(moved.robots).toEqual(map.robots);
+
+      await patchMap(
+        owner,
+        [{ type: 'delete', objectType: 'obstacle', objectId: o.id }],
+        id,
+      ).expect(204);
+      expect(await getMap(id)).toMatchObject({
+        obstacles: [],
+        stations: [{ id: s.id }],
+        robots: [{ id: r.id }],
+      });
+    });
+
+    it('never returns a half-applied map', async () => {
+      await patchMap(owner, [obstacle(3, 3)]).expect(204);
+      const maps: Awaited<ReturnType<typeof getMap>>[] = [];
+      const edits = (async () => {
+        for (let i = 0; i < 10; i += 1) {
+          const { obstacles, stations } = await getMap();
+          const [o] = obstacles;
+          const [s] = stations;
+          await patchMap(
+            owner,
+            o
+              ? [
+                  { type: 'delete', objectType: 'obstacle', objectId: o.id },
+                  station(3, 3),
+                ]
+              : [
+                  { type: 'delete', objectType: 'station', objectId: s?.id },
+                  obstacle(3, 3),
+                ],
+          ).expect(204);
+        }
+      })();
+      const reads = Array.from({ length: 3 }, async () => {
+        for (let i = 0; i < 20; i += 1) {
+          maps.push(await getMap());
+        }
+      });
+      await Promise.all([edits, ...reads]);
+
+      for (const { obstacles, stations } of maps) {
+        expect(obstacles.length + stations.length).toBe(1);
+      }
     });
   });
 
@@ -212,7 +342,7 @@ describe('Warehouse map API with PostgreSQL', () => {
       }
     });
 
-    it('moves and deletes persisted objects of every type', async () => {
+    it('moves obstacles and stations and deletes objects of every type', async () => {
       const o = await prisma.obstacle.create({
         data: { warehouseId, x: 1, y: 1 },
       });
@@ -225,16 +355,15 @@ describe('Warehouse map API with PostgreSQL', () => {
 
       await patchMap(owner, [
         { type: 'move', objectType: 'obstacle', objectId: o.id, x: 2, y: 2 },
-        { type: 'move', objectType: 'station', objectId: s.id, x: 6, y: 5 },
-        { type: 'move', objectType: 'robot', objectId: r.id, x: 6, y: 6 },
+        { type: 'move', objectType: 'station', objectId: s.id, x: 6, y: 6 },
       ]).expect(204);
 
       const moved = await snapshot();
       expect(moved.obstacles).toMatchObject([{ id: o.id, x: 2, y: 2 }]);
       expect(moved.stations).toMatchObject([
-        { id: s.id, x: 6, y: 5, name: 'S', direction: 'east' },
+        { id: s.id, x: 6, y: 6, name: 'S', direction: 'east' },
       ]);
-      expect(moved.robots).toMatchObject([{ id: r.id, x: 6, y: 6 }]);
+      expect(moved.robots).toMatchObject([{ id: r.id, x: 5, y: 6 }]);
 
       await patchMap(owner, [
         { type: 'delete', objectType: 'robot', objectId: r.id },
@@ -331,6 +460,126 @@ describe('Warehouse map API with PostgreSQL', () => {
       expect(await snapshot()).toEqual(empty);
 
       await patchMap(owner, [station(5, 5), robot(5, 6)]).expect(204);
+    });
+
+    it.each(['north', 'south', 'east', 'west'] as const)(
+      'accepts robots on all four sides of a station facing %s, never diagonally',
+      async (direction) => {
+        const charger = station(5, 5, 'S', direction);
+        await patchMap(owner, [
+          charger,
+          robot(4, 5),
+          robot(6, 5),
+          robot(5, 4),
+          robot(5, 6),
+        ]).expect(204);
+        await patchMap(owner, [robot(4, 4)]).expect(422);
+
+        const map = await getMap();
+        expect(map.robots).toHaveLength(4);
+        expect(map.stations).toMatchObject([{ direction }]);
+      },
+    );
+
+    it('rejects robot movement with 400 and keeps the robot in place', async () => {
+      await patchMap(owner, [station(5, 5), robot(5, 6)]).expect(204);
+      const { robots } = await getMap();
+
+      await patchMap(owner, [
+        obstacle(1, 1),
+        {
+          type: 'move',
+          objectType: 'robot',
+          objectId: robots[0]?.id,
+          x: 5,
+          y: 4,
+        },
+      ]).expect(400);
+
+      expect((await getMap()).robots).toEqual(robots);
+      expect(await objectsAt(1, 1)).toBe(0);
+    });
+
+    it('forbids deleting a station next to a robot and rolls back', async () => {
+      await patchMap(owner, [station(5, 5), robot(5, 6)]).expect(204);
+      const { stations, robots } = await getMap();
+      const deleteStation = {
+        type: 'delete',
+        objectType: 'station',
+        objectId: stations[0]?.id,
+      };
+      const deleteRobot = {
+        type: 'delete',
+        objectType: 'robot',
+        objectId: robots[0]?.id,
+      };
+      const before = await snapshot();
+      const touched = await updatedAt();
+
+      await patchMap(owner, [obstacle(1, 1), deleteStation]).expect(422);
+      // The order matters: the robot is still there when the station goes.
+      await patchMap(owner, [deleteStation, deleteRobot]).expect(422);
+      expect(await snapshot()).toEqual(before);
+      expect(await updatedAt()).toBe(touched);
+
+      await patchMap(owner, [deleteRobot, deleteStation]).expect(204);
+      expect(await snapshot()).toEqual(empty);
+    });
+
+    it('forbids the deletion even when a second station is adjacent', async () => {
+      await patchMap(owner, [
+        station(5, 5, 'A'),
+        robot(5, 6),
+        station(5, 7, 'B'),
+      ]).expect(204);
+      const { stations } = await getMap();
+
+      for (const { id } of stations) {
+        await patchMap(owner, [
+          { type: 'delete', objectType: 'station', objectId: id },
+        ]).expect(422);
+      }
+      expect((await getMap()).stations).toEqual(stations);
+    });
+
+    it.each([
+      [1, 1],
+      [1, 500],
+      [500, 1],
+      [7, 3],
+    ])('uses the stored dimensions of a %i×%i map', async (width, height) => {
+      const created = await owner.agent
+        .post('/warehouses')
+        .set('X-CSRF-Token', owner.csrfToken)
+        .send({ name: 'Sized warehouse', width, height })
+        .expect(201);
+      const { warehouseId: id } = created.body as { warehouseId: string };
+      const [x, y] = [width - 1, height - 1];
+
+      await patchMap(owner, [obstacle(width, y)], id).expect(422);
+      await patchMap(owner, [obstacle(x, height)], id).expect(422);
+      await patchMap(owner, [obstacle(x, y)], id).expect(204);
+      expect((await getMap(id)).obstacles).toMatchObject([{ x, y }]);
+    });
+
+    it('accepts 400 changes per batch, rejects 401 and allows more objects in total', async () => {
+      const cells = Array.from({ length: 401 }, (_, i) =>
+        obstacle(i % 100, Math.floor(i / 100)),
+      );
+      await prisma.warehouse.update({
+        where: { id: warehouseId },
+        data: { width: 100 },
+      });
+
+      await patchMap(owner, cells).expect(400);
+      expect(await snapshot()).toEqual(empty);
+      await patchMap(owner, cells.slice(0, 400)).expect(204);
+      await patchMap(owner, cells.slice(400)).expect(204);
+      expect((await getMap()).obstacles).toHaveLength(401);
+    });
+
+    it('returns 400 for a name PostgreSQL cannot store', async () => {
+      await patchMap(owner, [station(1, 1, 'a\0b')]).expect(400);
     });
 
     it('rejects removing or moving the last adjacent station of a robot', async () => {
@@ -458,6 +707,27 @@ describe('Warehouse map API with PostgreSQL', () => {
       expect(response.status).toBe(422);
       expect(await objectsAt(4, 4)).toBe(1);
       expect((await snapshot()).stations).toEqual([]);
+    });
+
+    it('returns 503 and saves nothing when the lock is held too long', async () => {
+      const before = await updatedAt();
+
+      await prisma.$transaction(
+        async (tx) => {
+          await tx.$queryRaw`
+            SELECT id FROM warehouses WHERE id = ${warehouseId}::uuid FOR UPDATE
+          `;
+          await patchMap(owner, [obstacle(4, 4)]).expect(503, {
+            statusCode: 503,
+            message: 'Service unavailable',
+          });
+        },
+        { timeout: 8000 },
+      );
+
+      expect(await objectsAt(4, 4)).toBe(0);
+      expect(await updatedAt()).toBe(before);
+      await patchMap(owner, [obstacle(4, 4)]).expect(204);
     });
   });
 

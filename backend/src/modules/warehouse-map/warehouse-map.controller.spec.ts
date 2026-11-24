@@ -1,6 +1,6 @@
 import {
-  ForbiddenException,
   NotFoundException,
+  ServiceUnavailableException,
   StandardSchemaValidationPipe,
   UnauthorizedException,
   UnprocessableEntityException,
@@ -36,9 +36,9 @@ const createObstacle = {
   x: 1,
   y: 2,
 } as const;
-const moveRobot = {
+const moveStation = {
   type: 'move',
-  objectType: 'robot',
+  objectType: 'station',
   objectId: OBJECT_ID,
   x: 3,
   y: 4,
@@ -131,7 +131,7 @@ describe('WarehouseMapController', () => {
 
   it('forwards the authenticated user id and the changes to the service', async () => {
     const input: BatchObjectChangesInput = {
-      changes: [createObstacle, moveRobot],
+      changes: [createObstacle, moveStation],
     };
     const authenticated = {
       auth: { user: { id: USER_ID }, sessionId: 'session-1' },
@@ -266,14 +266,15 @@ describe('WarehouseMapController', () => {
     expect(changes).toEqual([createObstacle]);
   });
 
-  it('accepts robot movement', async () => {
-    const response = await patchObjects({ changes: [moveRobot] });
+  it('accepts station movement', async () => {
+    const response = await patchObjects({ changes: [moveStation] });
 
     expect(response.status).toBe(204);
-    expect(applyChanges.mock.calls[0]?.[2]).toEqual([moveRobot]);
+    expect(applyChanges.mock.calls[0]?.[2]).toEqual([moveStation]);
   });
 
   it.each([
+    ['robot movement', { changes: [{ ...moveStation, objectType: 'robot' }] }],
     ['a missing changes field', {}],
     ['an empty batch', { changes: [] }],
     ['more than 400 changes', { changes: Array(401).fill(createObstacle) }],
@@ -311,8 +312,7 @@ describe('WarehouseMapController', () => {
   });
 
   it.each([
-    [403, new ForbiddenException('Warehouse belongs to another user')],
-    [404, new NotFoundException('Warehouse not found')],
+    [404, new NotFoundException('Склад не найден.')],
     [422, new UnprocessableEntityException('Cell is already occupied')],
   ])('propagates a %s from the service', async (status, error) => {
     applyChanges.mockRejectedValue(error);
@@ -323,6 +323,18 @@ describe('WarehouseMapController', () => {
     expect(response.body).toEqual({
       statusCode: status,
       message: error.message,
+    });
+  });
+
+  it('reports a busy map as 503', async () => {
+    applyChanges.mockRejectedValue(new ServiceUnavailableException());
+
+    const response = await patchObjects({ changes: [createObstacle] });
+
+    expect(response.status).toBe(503);
+    expect(response.body).toEqual({
+      statusCode: 503,
+      message: 'Service unavailable',
     });
   });
 

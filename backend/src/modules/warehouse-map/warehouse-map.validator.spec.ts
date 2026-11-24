@@ -49,7 +49,7 @@ const remove = (
   objectId: string,
 ): ObjectChange => ({ type: 'delete', objectType, objectId });
 const move = (
-  objectType: 'obstacle' | 'station' | 'robot',
+  objectType: 'obstacle' | 'station',
   objectId: string,
   x: number,
   y: number,
@@ -120,8 +120,11 @@ describe('validateObjectChanges', () => {
   });
 
   describe('delete', () => {
-    it('accepts deleting an existing object', () => {
-      const change = remove('station', STATION_ID);
+    it.each([
+      ['obstacle', OBSTACLE_ID],
+      ['robot', ROBOT_ID],
+    ] as const)('accepts deleting an existing %s', (objectType, id) => {
+      const change = remove(objectType, id);
       expect(validate([change])).toEqual({ valid: true, operations: [change] });
     });
 
@@ -250,31 +253,14 @@ describe('validateObjectChanges', () => {
   });
 
   describe('robots and charging stations', () => {
-    it('accepts moving a robot to an empty cell next to a station', () => {
-      const change = move('robot', ROBOT_ID, 3, 2);
-      expect(validate([change])).toEqual({ valid: true, operations: [change] });
-    });
-
-    it('rejects moving a robot away from every station', () => {
-      expect(validate([move('robot', ROBOT_ID, 10, 10)])).toEqual(
-        adjacencyFailure(10, 10, { robotId: ROBOT_ID }),
-      );
-    });
-
-    it('rejects moving a robot outside the map or onto an object', () => {
-      expect(validate([move('robot', ROBOT_ID, -1, 3)])).toMatchObject({
-        failure: { index: 0, reason: 'OUT_OF_BOUNDS' },
-      });
-      expect(validate([move('robot', ROBOT_ID, 2, 2)])).toMatchObject({
-        failure: { index: 0, reason: 'CELL_OCCUPIED' },
-      });
-    });
-
-    it('rejects moving a robot with the wrong objectType', () => {
-      expect(validate([move('robot', STATION_ID, 3, 2)])).toMatchObject({
-        failure: { index: 0, reason: 'NOT_FOUND' },
-      });
-    });
+    it.each(['obstacle', 'station'] as const)(
+      'cannot move a robot by claiming it is a %s',
+      (objectType) => {
+        expect(validate([move(objectType, ROBOT_ID, 3, 2)])).toMatchObject({
+          failure: { index: 0, reason: 'NOT_FOUND' },
+        });
+      },
+    );
 
     it.each([
       ['west', 1, 5],
@@ -317,18 +303,90 @@ describe('validateObjectChanges', () => {
       });
     });
 
-    it('rejects deleting the only stations next to a robot', () => {
+    it.each([
+      ['west', 4, 5],
+      ['east', 6, 5],
+      ['north', 5, 4],
+      ['south', 5, 6],
+    ])('rejects deleting a station with a robot to the %s', (_d, x, y) => {
+      const change = remove('station', STATION_ID);
+      const map = makeMap([
+        { id: STATION_ID, objectType: 'station', x: 5, y: 5 },
+        { id: ROBOT_ID, objectType: 'robot', x, y },
+      ]);
+      expect(validate([change], map)).toEqual({
+        valid: false,
+        failure: { index: 0, reason: 'STATION_HAS_ADJACENT_ROBOT', change },
+      });
+    });
+
+    it('rejects deleting a station even when another one stays adjacent', () => {
+      const change = remove('station', STATION_ID);
+      expect(validate([change])).toEqual({
+        valid: false,
+        failure: { index: 0, reason: 'STATION_HAS_ADJACENT_ROBOT', change },
+      });
+    });
+
+    it('accepts deleting a station whose only nearby robot is diagonal', () => {
+      const change = remove('station', STATION_ID);
+      const map = makeMap([
+        { id: STATION_ID, objectType: 'station', x: 5, y: 5 },
+        { id: ROBOT_ID, objectType: 'robot', x: 6, y: 6 },
+        { id: SECOND_STATION_ID, objectType: 'station', x: 7, y: 6 },
+      ]);
+      expect(validate([change], map)).toEqual({
+        valid: true,
+        operations: [change],
+      });
+    });
+
+    it('accepts deleting the robot and then its stations', () => {
       const changes = [
+        remove('robot', ROBOT_ID),
         remove('station', STATION_ID),
         remove('station', SECOND_STATION_ID),
       ];
-      expect(validate(changes)).toEqual(
-        adjacencyFailure(2, 3, { robotId: ROBOT_ID }),
-      );
+      expect(validate(changes)).toEqual({ valid: true, operations: changes });
     });
 
-    it('accepts deleting a station when another one stays adjacent', () => {
-      const change = remove('station', STATION_ID);
+    it('rejects deleting the station before its robot', () => {
+      expect(
+        validate([remove('station', STATION_ID), remove('robot', ROBOT_ID)]),
+      ).toMatchObject({
+        failure: { index: 0, reason: 'STATION_HAS_ADJACENT_ROBOT' },
+      });
+    });
+
+    it('considers robots created earlier in the batch', () => {
+      const map = makeMap([
+        { id: STATION_ID, objectType: 'station', x: 5, y: 5 },
+      ]);
+      expect(
+        validate([createRobot(5, 6), remove('station', STATION_ID)], map),
+      ).toMatchObject({
+        failure: { index: 1, reason: 'STATION_HAS_ADJACENT_ROBOT' },
+      });
+    });
+
+    it('evaluates a deletion at the position the station was moved to', () => {
+      const away = [
+        move('station', STATION_ID, 10, 10),
+        remove('station', STATION_ID),
+      ];
+      expect(validate(away)).toEqual({ valid: true, operations: away });
+      expect(
+        validate([
+          move('station', STATION_ID, 3, 3),
+          remove('station', STATION_ID),
+        ]),
+      ).toMatchObject({
+        failure: { index: 1, reason: 'STATION_HAS_ADJACENT_ROBOT' },
+      });
+    });
+
+    it('accepts moving a station away when another one stays adjacent', () => {
+      const change = move('station', STATION_ID, 10, 10);
       expect(validate([change])).toEqual({ valid: true, operations: [change] });
     });
 
@@ -344,8 +402,8 @@ describe('validateObjectChanges', () => {
 
     it('validates adjacency against the final state of the batch', () => {
       const changes = [
-        remove('station', STATION_ID),
-        remove('station', SECOND_STATION_ID),
+        move('station', STATION_ID, 10, 10),
+        move('station', SECOND_STATION_ID, 12, 12),
         createStation(1, 3),
       ];
       expect(validate(changes)).toEqual({ valid: true, operations: changes });
@@ -359,9 +417,10 @@ describe('validateObjectChanges', () => {
       });
     });
 
-    it('accepts moving a robot and its station in one batch', () => {
+    it('accepts replacing a robot next to a moved station', () => {
       const changes = [
-        move('robot', ROBOT_ID, 10, 10),
+        remove('robot', ROBOT_ID),
+        createRobot(10, 10),
         move('station', STATION_ID, 10, 11),
       ];
       expect(validate(changes)).toEqual({ valid: true, operations: changes });
@@ -376,7 +435,7 @@ describe('validateObjectChanges', () => {
         { id: otherStationId, objectType: 'station', x: 15, y: 16 },
       ];
       expect(
-        validate([remove('station', otherStationId)], makeMap(objects)),
+        validate([move('station', otherStationId, 18, 18)], makeMap(objects)),
       ).toEqual(adjacencyFailure(15, 15, { robotId: otherRobotId }));
     });
 
@@ -389,14 +448,17 @@ describe('validateObjectChanges', () => {
     });
 
     it('rejects an invalid final map for a batch of only no-op moves', () => {
-      const map = makeMap([{ id: ROBOT_ID, objectType: 'robot', x: 9, y: 9 }]);
-      expect(validate([move('robot', ROBOT_ID, 9, 9)], map)).toEqual(
+      const map = makeMap([
+        { id: OBSTACLE_ID, objectType: 'obstacle', x: 1, y: 1 },
+        { id: ROBOT_ID, objectType: 'robot', x: 9, y: 9 },
+      ]);
+      expect(validate([move('obstacle', OBSTACLE_ID, 1, 1)], map)).toEqual(
         adjacencyFailure(9, 9, { robotId: ROBOT_ID }),
       );
     });
 
     it('accepts a valid final map for a batch of only no-op moves', () => {
-      expect(validate([move('robot', ROBOT_ID, 2, 3)])).toEqual({
+      expect(validate([move('station', STATION_ID, 2, 2)])).toEqual({
         valid: true,
         operations: [],
       });
@@ -408,27 +470,13 @@ describe('validateObjectChanges', () => {
       );
     });
 
-    it('reports no index for a robot stranded by a station deletion', () => {
-      const result = validate([
-        remove('station', STATION_ID),
-        remove('station', SECOND_STATION_ID),
-      ]);
-      expect(result).toEqual(adjacencyFailure(2, 3, { robotId: ROBOT_ID }));
-      expect(result).not.toHaveProperty('failure.index');
-    });
-
     it('reports no index for a robot stranded by a station move', () => {
       const result = validate([
         move('station', STATION_ID, 10, 10),
         move('station', SECOND_STATION_ID, 12, 12),
       ]);
       expect(result).toEqual(adjacencyFailure(2, 3, { robotId: ROBOT_ID }));
-    });
-
-    it('reports the persisted id for a moved robot, without an index', () => {
-      expect(validate([move('robot', ROBOT_ID, 10, 10)])).toEqual(
-        adjacencyFailure(10, 10, { robotId: ROBOT_ID }),
-      );
+      expect(result).not.toHaveProperty('failure.index');
     });
   });
 
@@ -437,11 +485,11 @@ describe('validateObjectChanges', () => {
       const changes = [
         createObstacle(5, 5),
         move('obstacle', OBSTACLE_ID, 5, 6),
+        remove('robot', ROBOT_ID),
         remove('station', STATION_ID),
         createRobot(3, 4),
         move('obstacle', OBSTACLE_ID, 5, 7),
         createStation(5, 6),
-        remove('robot', ROBOT_ID),
       ];
       expect(validate(changes)).toEqual({ valid: true, operations: changes });
     });
@@ -503,6 +551,7 @@ describe('validateObjectChanges', () => {
       const map = makeMap(objects);
       const changes = [
         move('obstacle', OBSTACLE_ID, 10, 10),
+        remove('robot', ROBOT_ID),
         remove('station', STATION_ID),
         createRobot(3, 4),
       ];
@@ -518,7 +567,7 @@ describe('validateObjectChanges', () => {
     });
 
     it('gives the same result when called twice on the same snapshot', () => {
-      const changes = [remove('station', STATION_ID), createRobot(3, 4)];
+      const changes = [remove('robot', ROBOT_ID), createRobot(3, 4)];
       const map = makeMap();
       expect(validateObjectChanges(map, changes)).toEqual(
         validateObjectChanges(map, changes),

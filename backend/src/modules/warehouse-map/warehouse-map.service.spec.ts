@@ -1,5 +1,4 @@
 import {
-  ForbiddenException,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -10,10 +9,10 @@ import type { ObjectChange } from './warehouse-map.schemas.js';
 import {
   WAREHOUSE_MAP_STORAGE,
   WarehouseMapService,
-  type WarehouseMapRecord,
   type WarehouseMapStorage,
   type WarehouseMapTransaction,
 } from './warehouse-map.service.js';
+import type { WarehouseMapState } from './warehouse-map.validator.js';
 
 const WAREHOUSE_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const OWNER_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -24,8 +23,7 @@ const ROBOT_ID = '33333333-3333-4333-8333-333333333333';
 const SECOND_STATION_ID = '44444444-4444-4444-8444-444444444444';
 const MISSING_ID = '99999999-9999-4999-8999-999999999999';
 
-const warehouse: WarehouseMapRecord = {
-  ownerId: OWNER_ID,
+const warehouse: WarehouseMapState = {
   width: 20,
   height: 20,
   objects: [
@@ -62,7 +60,7 @@ const remove = (
   objectId: string,
 ): ObjectChange => ({ type: 'delete', objectType, objectId });
 const move = (
-  objectType: 'obstacle' | 'station' | 'robot',
+  objectType: 'obstacle' | 'station',
   objectId: string,
   x: number,
   y: number,
@@ -134,7 +132,10 @@ describe('WarehouseMapService', () => {
       ['moves a station', [move('station', STATION_ID, 9, 9)]],
       ['deletes a robot', [remove('robot', ROBOT_ID)]],
       ['creates a robot next to a station', [createRobot(3, 2)]],
-      ['moves a robot next to a station', [move('robot', ROBOT_ID, 3, 2)]],
+      [
+        'deletes a robot and then its station',
+        [remove('robot', ROBOT_ID), remove('station', STATION_ID)],
+      ],
     ])('%s and touches the warehouse', async (_name, changes) => {
       await expect(apply(changes)).resolves.toBeUndefined();
       expectForwarded(changes);
@@ -148,6 +149,7 @@ describe('WarehouseMapService', () => {
       expect(mock.runInTransaction).toHaveBeenCalledTimes(1);
       expect(mock.transaction.loadWarehouseMap).toHaveBeenCalledWith(
         WAREHOUSE_ID,
+        OWNER_ID,
       );
     });
 
@@ -155,6 +157,7 @@ describe('WarehouseMapService', () => {
       const changes = [
         createObstacle(5, 5),
         move('obstacle', OBSTACLE_ID, 5, 6),
+        remove('robot', ROBOT_ID),
         remove('station', STATION_ID),
         createStation(5, 7),
         move('obstacle', OBSTACLE_ID, 5, 8),
@@ -180,8 +183,8 @@ describe('WarehouseMapService', () => {
 
     it('accepts a batch that is only valid in its final state', async () => {
       const changes = [
-        remove('station', STATION_ID),
-        remove('station', SECOND_STATION_ID),
+        move('station', STATION_ID, 10, 10),
+        move('station', SECOND_STATION_ID, 12, 12),
         createStation(1, 3),
       ];
       await apply(changes);
@@ -202,7 +205,7 @@ describe('WarehouseMapService', () => {
       await apply([
         move('obstacle', OBSTACLE_ID, 1, 1),
         effective,
-        move('robot', ROBOT_ID, 2, 3),
+        move('station', STATION_ID, 2, 2),
       ]);
       expectForwarded([effective]);
       expect(mock.transaction.touchWarehouse).toHaveBeenCalledTimes(1);
@@ -217,25 +220,23 @@ describe('WarehouseMapService', () => {
   });
 
   describe('warehouse access', () => {
-    it('throws 404 when the warehouse does not exist', async () => {
+    it('throws 404 for a missing or foreign warehouse', async () => {
       mock.transaction.loadWarehouseMap.mockResolvedValue(null);
-      await expect(apply([createObstacle(5, 5)])).rejects.toBeInstanceOf(
-        NotFoundException,
+      await expect(
+        applyAs(OTHER_USER_ID, [createObstacle(5, 5)]),
+      ).rejects.toMatchObject({ status: 404, message: 'Склад не найден.' });
+      expect(mock.transaction.loadWarehouseMap).toHaveBeenCalledWith(
+        WAREHOUSE_ID,
+        OTHER_USER_ID,
       );
       expectNoWrites();
     });
 
-    it('throws 403 when the user is not the owner', async () => {
+    it('checks access before validating the changes', async () => {
+      mock.transaction.loadWarehouseMap.mockResolvedValue(null);
       await expect(
-        applyAs(OTHER_USER_ID, [createObstacle(5, 5)]),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-      expectNoWrites();
-    });
-
-    it('checks ownership before validating the changes', async () => {
-      await expect(
-        applyAs(OTHER_USER_ID, [remove('robot', MISSING_ID)]),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+        applyAs(OTHER_USER_ID, [createObstacle(-1, -1)]),
+      ).rejects.toThrow('Склад не найден.');
     });
   });
 
@@ -252,11 +253,10 @@ describe('WarehouseMapService', () => {
     it.each([
       ['an occupied create', createObstacle(1, 1)],
       ['an occupied move', move('obstacle', OBSTACLE_ID, 2, 2)],
-      ['an occupied robot move', move('robot', ROBOT_ID, 1, 1)],
       ['an out-of-bounds create', createObstacle(20, 0)],
       ['a negative create', createObstacle(-1, 0)],
       ['an out-of-bounds move', move('station', STATION_ID, 0, 20)],
-      ['an out-of-bounds robot move', move('robot', ROBOT_ID, 20, 3)],
+      ['deleting a station next to a robot', remove('station', STATION_ID)],
     ])('throws 422 for %s', async (_name, change) => {
       await expect(apply([change])).rejects.toBeInstanceOf(
         UnprocessableEntityException,
@@ -271,10 +271,9 @@ describe('WarehouseMapService', () => {
         [createObstacle(10, 10), createRobot(10, 11)],
       ],
       ['a robot created diagonally to a station', [createRobot(3, 3)]],
-      ['a robot moved away from stations', [move('robot', ROBOT_ID, 10, 10)]],
       [
-        'a robot left without stations',
-        [remove('station', STATION_ID), remove('station', SECOND_STATION_ID)],
+        'a station deleted before its robot',
+        [remove('station', STATION_ID), remove('robot', ROBOT_ID)],
       ],
       [
         'stations moved away from a robot',
@@ -309,6 +308,11 @@ describe('WarehouseMapService', () => {
       await expect(apply([remove('robot', MISSING_ID)])).rejects.toThrow(
         'Change 0: Map object not found',
       );
+      await expect(
+        apply([createObstacle(5, 5), remove('station', STATION_ID)]),
+      ).rejects.toThrow(
+        'Change 1: Station cannot be deleted while a robot is adjacent to it',
+      );
     });
 
     it('names the robot cell in an adjacency failure', async () => {
@@ -320,25 +324,24 @@ describe('WarehouseMapService', () => {
     it('omits the change index for a robot stranded by a station change', async () => {
       await expect(
         apply([
-          remove('station', STATION_ID),
-          remove('station', SECOND_STATION_ID),
+          move('station', STATION_ID, 10, 10),
+          move('station', SECOND_STATION_ID, 12, 12),
         ]),
-      ).rejects.toThrow('Robot at (2, 3) must be adjacent to a station');
-      await expect(
-        apply([
-          remove('station', STATION_ID),
-          remove('station', SECOND_STATION_ID),
-        ]),
-      ).rejects.not.toThrow('Change');
+      ).rejects.toMatchObject({
+        message: 'Robot at (2, 3) must be adjacent to a station',
+      });
     });
 
     it('rejects a no-op batch on an invalid map without writing', async () => {
       mock.transaction.loadWarehouseMap.mockResolvedValue({
         ...warehouse,
-        objects: [{ id: ROBOT_ID, objectType: 'robot', x: 9, y: 9 }],
+        objects: [
+          { id: OBSTACLE_ID, objectType: 'obstacle', x: 1, y: 1 },
+          { id: ROBOT_ID, objectType: 'robot', x: 9, y: 9 },
+        ],
       });
       await expect(
-        apply([move('robot', ROBOT_ID, 9, 9)]),
+        apply([move('obstacle', OBSTACLE_ID, 1, 1)]),
       ).rejects.toBeInstanceOf(UnprocessableEntityException);
       expectNoWrites();
     });

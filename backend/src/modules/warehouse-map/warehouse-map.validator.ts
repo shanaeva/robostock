@@ -16,7 +16,10 @@ export interface WarehouseMapState {
 }
 
 export type OperationFailureReason =
-  'NOT_FOUND' | 'OUT_OF_BOUNDS' | 'CELL_OCCUPIED';
+  | 'NOT_FOUND'
+  | 'OUT_OF_BOUNDS'
+  | 'CELL_OCCUPIED'
+  | 'STATION_HAS_ADJACENT_ROBOT';
 
 export interface OperationFailure {
   index: number;
@@ -50,15 +53,15 @@ interface TrackedObject {
 
 const cellKey = (x: number, y: number): string => `${String(x)},${String(y)}`;
 
-const hasAdjacentStation = (
-  stations: ReadonlySet<string>,
+const hasAdjacentCell = (
+  cells: ReadonlySet<string>,
   x: number,
   y: number,
 ): boolean =>
-  stations.has(cellKey(x - 1, y)) ||
-  stations.has(cellKey(x + 1, y)) ||
-  stations.has(cellKey(x, y - 1)) ||
-  stations.has(cellKey(x, y + 1));
+  cells.has(cellKey(x - 1, y)) ||
+  cells.has(cellKey(x + 1, y)) ||
+  cells.has(cellKey(x, y - 1)) ||
+  cells.has(cellKey(x, y + 1));
 
 export function validateObjectChanges(
   map: WarehouseMapState,
@@ -66,10 +69,16 @@ export function validateObjectChanges(
 ): BatchValidationResult {
   const objects = new Map<string, TrackedObject>();
   const occupied = new Set<string>();
+  const robotCells = new Set<string>();
 
   for (const { id, objectType, x, y } of map.objects) {
+    const key = cellKey(x, y);
     objects.set(id, { id, objectType, x, y });
-    occupied.add(cellKey(x, y));
+    occupied.add(key);
+
+    if (objectType === 'robot') {
+      robotCells.add(key);
+    }
   }
 
   const isInside = (x: number, y: number): boolean =>
@@ -93,6 +102,10 @@ export function validateObjectChanges(
         return fail('CELL_OCCUPIED');
       }
       occupied.add(key);
+
+      if (change.objectType === 'robot') {
+        robotCells.add(key);
+      }
       objects.set(`created:${String(index)}`, {
         createdAt: index,
         objectType: change.objectType,
@@ -110,8 +123,21 @@ export function validateObjectChanges(
     }
 
     if (change.type === 'delete') {
+      // Checked against the batch state so far: another adjacent station does
+      // not lift the restriction, but deleting the robot first does.
+      if (
+        target.objectType === 'station' &&
+        hasAdjacentCell(robotCells, target.x, target.y)
+      ) {
+        return fail('STATION_HAS_ADJACENT_ROBOT');
+      }
+      const key = cellKey(target.x, target.y);
       objects.delete(change.objectId);
-      occupied.delete(cellKey(target.x, target.y));
+      occupied.delete(key);
+
+      if (target.objectType === 'robot') {
+        robotCells.delete(key);
+      }
       operations.push(change);
       continue;
     }
@@ -144,7 +170,7 @@ export function validateObjectChanges(
   }
 
   for (const { id, createdAt, objectType, x, y } of objects.values()) {
-    if (objectType === 'robot' && !hasAdjacentStation(stations, x, y)) {
+    if (objectType === 'robot' && !hasAdjacentCell(stations, x, y)) {
       return {
         valid: false,
         failure: {

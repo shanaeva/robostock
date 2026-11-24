@@ -41,15 +41,13 @@ describe('objectChangeSchema', () => {
     { type: 'delete', objectType: 'robot', objectId: ID },
     moveObstacle,
     { ...moveObstacle, objectType: 'station' },
-    { ...moveObstacle, objectType: 'robot' },
   ])('accepts a valid operation (%#)', (input) => {
     expect(objectChangeSchema.parse(input)).toEqual(input);
   });
 
-  it('rejects moving an unknown object type', () => {
+  it.each(['robot', 'wall'])('rejects moving a %s', (objectType) => {
     expect(
-      objectChangeSchema.safeParse({ ...moveObstacle, objectType: 'wall' })
-        .success,
+      objectChangeSchema.safeParse({ ...moveObstacle, objectType }).success,
     ).toBe(false);
   });
 
@@ -158,6 +156,15 @@ describe('objectChangeSchema', () => {
         }).success,
       ).toBe(true);
     });
+
+    it.each([createRobot, createStation])(
+      'rejects NUL characters, which PostgreSQL cannot store (%#)',
+      (base) => {
+        expect(
+          objectChangeSchema.safeParse({ ...base, name: 'a\0b' }).success,
+        ).toBe(false);
+      },
+    );
 
     it('rejects non-string names', () => {
       expect(

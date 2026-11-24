@@ -1,20 +1,41 @@
-import { Inject, Injectable } from '@nestjs/common';
-import type { Prisma } from '../../generated/prisma/client.js';
+import {
+  Inject,
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { ObjectChange } from './warehouse-map.schemas.js';
 import type {
-  WarehouseMapRecord,
   WarehouseMapStorage,
   WarehouseMapTransaction,
 } from './warehouse-map.service.js';
+import type { WarehouseMapState } from './warehouse-map.validator.js';
 
 // 400 sequential statements can exceed Prisma's 5 s default.
 const TRANSACTION_OPTIONS = { timeout: 10_000, maxWait: 2_000 } as const;
 
+type MoveObjectChange = Extract<ObjectChange, { type: 'move' }>;
+
 interface WarehouseRow {
-  ownerId: string;
   width: number;
   height: number;
+}
+
+// P2028: no free connection within maxWait, or the transaction expired.
+// 55P03: lock_timeout. Nothing was committed, so the request can be retried.
+function isBusyError(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+    return false;
+  }
+
+  if (error.code === 'P2028') {
+    return true;
+  }
+  const meta = error.meta as
+    { driverAdapterError?: { cause?: { originalCode?: unknown } } } | undefined;
+
+  return meta?.driverAdapterError?.cause?.originalCode === '55P03';
 }
 
 class PrismaWarehouseMapTransaction implements WarehouseMapTransaction {
@@ -22,17 +43,23 @@ class PrismaWarehouseMapTransaction implements WarehouseMapTransaction {
 
   async loadWarehouseMap(
     warehouseId: string,
-  ): Promise<WarehouseMapRecord | null> {
+    ownerId: string,
+  ): Promise<WarehouseMapState | null> {
+    // Must stay below the pg driver's 5 s query_timeout, which would otherwise
+    // abort the wait on the client side with a generic error.
+    await this.tx.$executeRaw`SET LOCAL lock_timeout = '3s'`;
+
     // Every map edit locks the warehouse row first. Cell occupancy spans three
     // tables, which no unique constraint can cover, so edits of one warehouse
     // are serialized here. The default READ COMMITTED isolation is required:
     // statements after the lock must see what the previous holder committed.
     // NO KEY UPDATE still conflicts with DELETE and UPDATE of the warehouse
-    // but not with foreign-key checks of other rows.
+    // but not with foreign-key checks of other rows. Filtering by owner keeps
+    // another user's warehouse from being locked.
     const [warehouse] = await this.tx.$queryRaw<WarehouseRow[]>`
-      SELECT "ownerId", width, height
+      SELECT width, height
       FROM warehouses
-      WHERE id = ${warehouseId}::uuid
+      WHERE id = ${warehouseId}::uuid AND "ownerId" = ${ownerId}::uuid
       FOR NO KEY UPDATE
     `;
 
@@ -48,7 +75,6 @@ class PrismaWarehouseMapTransaction implements WarehouseMapTransaction {
     ]);
 
     return {
-      ownerId: warehouse.ownerId,
       width: warehouse.width,
       height: warehouse.height,
       objects: [
@@ -142,7 +168,7 @@ class PrismaWarehouseMapTransaction implements WarehouseMapTransaction {
   }
 
   private moveOne(
-    objectType: ObjectChange['objectType'],
+    objectType: MoveObjectChange['objectType'],
     where: { id: string; warehouseId: string },
     data: { x: number; y: number },
   ): Promise<Prisma.BatchPayload> {
@@ -151,8 +177,6 @@ class PrismaWarehouseMapTransaction implements WarehouseMapTransaction {
         return this.tx.obstacle.updateMany({ where, data });
       case 'station':
         return this.tx.station.updateMany({ where, data });
-      case 'robot':
-        return this.tx.robot.updateMany({ where, data });
     }
   }
 }
@@ -161,12 +185,20 @@ class PrismaWarehouseMapTransaction implements WarehouseMapTransaction {
 export class PrismaWarehouseMapStorage implements WarehouseMapStorage {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
-  runInTransaction<T>(
+  async runInTransaction<T>(
     work: (transaction: WarehouseMapTransaction) => Promise<T>,
   ): Promise<T> {
-    return this.prisma.$transaction(
-      (tx) => work(new PrismaWarehouseMapTransaction(tx)),
-      TRANSACTION_OPTIONS,
-    );
+    try {
+      return await this.prisma.$transaction(
+        (tx) => work(new PrismaWarehouseMapTransaction(tx)),
+        TRANSACTION_OPTIONS,
+      );
+    } catch (error) {
+      if (isBusyError(error)) {
+        throw new ServiceUnavailableException();
+      }
+
+      throw error;
+    }
   }
 }

@@ -50,6 +50,8 @@ export const warehouseCreatedSchema = z
 const robotSchema = z.strictObject({
   id: warehouseIdSchema,
   name: createWarehouseSchema.shape.name,
+  x: z.number().int().min(0),
+  y: z.number().int().min(0),
 });
 
 const obstacleSchema = z.strictObject({
