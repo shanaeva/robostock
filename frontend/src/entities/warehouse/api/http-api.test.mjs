@@ -1,9 +1,7 @@
-import { warehouseMockFallback } from './mocks/handlers';
 import {
   afterAll,
   afterEach,
   beforeAll,
-  beforeEach,
   describe,
   expect,
   it,
@@ -11,21 +9,15 @@ import {
 } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import { createWarehouseNodeRuntime } from './mocks/node';
-import { createWarehouseDataSource } from './data-source';
 import { createWarehouseHttpApi } from './http-api';
 import { defaultWarehouseListParams } from './types';
-import { warehousesMock } from './mock-data';
 import { warehouseCreateSchema } from '../model/schemas';
 import {
   WarehouseApiError,
   getHttpErrorMessage,
   getWarehouseErrorMessage,
 } from './errors';
-import {
-  warehouseSummarySchema,
-  warehouseErrorSchema,
-} from '../model/api-contract';
+import { warehouseErrorSchema } from '../model/api-contract';
 
 const warehouseId = '10000000-0000-4000-8000-000000000001';
 const summary = { id: warehouseId, name: 'Основной', width: 32, height: 12 };
@@ -35,7 +27,6 @@ const api = () => createWarehouseHttpApi('https://api.example.test/v1');
 const server = setupServer();
 const requests = [];
 const unhandled = [];
-let runtime;
 
 beforeAll(() => {
   server.events.on('request:start', ({ request }) => requests.push(request));
@@ -44,14 +35,7 @@ beforeAll(() => {
   );
   server.listen({ onUnhandledRequest: 'error' });
 });
-beforeEach(() => {
-  runtime = createWarehouseNodeRuntime(server);
-});
 afterAll(() => server.close());
-
-function mockSource(options = {}) {
-  return createWarehouseDataSource({ ...options, mockRuntime: runtime });
-}
 
 function respondWith(response) {
   const handler = vi.fn(() => response.clone());
@@ -65,9 +49,8 @@ function respondWith(response) {
   return handler;
 }
 
-afterEach(async () => {
-  await runtime.deactivate();
-  server.resetHandlers(warehouseMockFallback);
+afterEach(() => {
+  server.resetHandlers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.useRealTimers();
@@ -82,30 +65,11 @@ describe('warehouse contract fixtures and errors', () => {
     [0, false],
     [501, false],
     [1.5, false],
-  ])('validates creation dimensions %s (valid: %s)', async (value, valid) => {
-    const source = mockSource({ demoScenario: 'empty' });
+  ])('validates creation dimensions %s (valid: %s)', (value, valid) => {
     for (const field of ['width', 'height']) {
       const input = { name: 'Boundary', width: 20, height: 20, [field]: value };
       expect(warehouseCreateSchema.safeParse(input).success).toBe(valid);
-      const result = source.create(input);
-      const assertion = valid
-        ? expect(result).resolves.toHaveProperty('warehouseId')
-        : expect(result).rejects.toMatchObject({ status: 400 });
-
-      await assertion;
     }
-    const list = source.list(defaultWarehouseListParams);
-
-    expect((await list).total).toBe(valid ? 2 : 0);
-  });
-
-  it('validates every initial mock warehouse and keeps IDs unique', () => {
-    for (const warehouse of warehousesMock) {
-      expect(warehouseSummarySchema.safeParse(warehouse).success).toBe(true);
-    }
-    expect(new Set(warehousesMock.map(({ id }) => id)).size).toBe(
-      warehousesMock.length,
-    );
   });
 
   it.each(['', ' \t\n '])(
@@ -301,105 +265,12 @@ describe('HTTP warehouse operations (OpenAPI 0.3.0-draft)', () => {
       message: expect.stringContaining('Не удалось связаться с сервером'),
     });
   });
-});
 
-describe('explicit data-source selection', () => {
-  it.each(['name', 'width', 'height'])(
-    'uses ID ASC to break %s ties in either primary direction',
-    async (sortBy) => {
-      const source = mockSource({ demoScenario: 'empty' });
-      const ids = [];
-      for (let index = 0; index < 4; index++) {
-        const higher = index === 3;
-        const created = source.create({
-          name: higher ? 'Z' : 'A',
-          width: higher ? 40 : 20,
-          height: higher ? 40 : 20,
-        });
-
-        ids.push((await created).warehouseId);
-      }
-      const tiedIds = ids.slice(0, 3).sort((a, b) => a.localeCompare(b));
-      for (const sortOrder of ['asc', 'desc']) {
-        const list = source.list({
-          ...defaultWarehouseListParams,
-          sortBy,
-          sortOrder,
-        });
-
-        expect((await list).list.map(({ id }) => id)).toEqual(
-          sortOrder === 'asc' ? [...tiedIds, ids[3]] : [ids[3], ...tiedIds],
-        );
-        const byId = source.list({
-          ...defaultWarehouseListParams,
-          sortBy: 'id',
-          sortOrder,
-        });
-
-        const sortedIds = [...ids].sort((a, b) => a.localeCompare(b));
-        expect((await byId).list.map(({ id }) => id)).toEqual(
-          sortOrder === 'asc' ? sortedIds : sortedIds.reverse(),
-        );
-      }
-    },
-  );
-
-  it('keeps HTTP errors, without falling back to mock data or enabling demo invitations', async () => {
-    const handler = respondWith(new Response(null, { status: 503 }));
-    const source = createWarehouseDataSource({
-      mode: 'http',
-      baseUrl: 'https://api.example.test',
-      demoScenario: 'empty',
-    });
-    expect(source.mode).toBe('http');
-    expect(source.invite).toBeUndefined();
-    await expect(source.list(defaultWarehouseListParams)).rejects.toMatchObject(
-      { status: 503 },
-    );
-    expect(handler).toHaveBeenCalledTimes(1);
-  });
-
-  it('ignores demo scenarios in HTTP mode even on a successful response', async () => {
-    respondWith(Response.json(listBody));
-    const source = createWarehouseDataSource({
-      mode: 'http',
-      baseUrl: 'https://api.example.test',
-      demoScenario: 'error',
-    });
-    await expect(source.list(defaultWarehouseListParams)).resolves.toEqual(
-      listBody,
-    );
-  });
-
-  it('reports missing URL and invalid mode instead of silently using mocks', async () => {
+  it('reports a missing API URL before sending a request', async () => {
     const handler = respondWith(Response.json(listBody));
-    const source = createWarehouseDataSource({ mode: 'http' });
-    await expect(source.list(defaultWarehouseListParams)).rejects.toThrow(
-      'NEXT_PUBLIC_API_BASE_URL',
-    );
+    await expect(
+      createWarehouseHttpApi().list(defaultWarehouseListParams),
+    ).rejects.toThrow('NEXT_PUBLIC_API_BASE_URL');
     expect(handler).not.toHaveBeenCalled();
-    expect(() => createWarehouseDataSource({ mode: 'typo' })).toThrow(
-      'используйте mock или http',
-    );
-  });
-
-  it('defaults to isolated HTTP mocks and filters demo roles before pagination', async () => {
-    const source = mockSource();
-    expect(source.mode).toBe('mock');
-    const result = await source.list({
-      ...defaultWarehouseListParams,
-      role: 'Observer',
-      limit: 1,
-      page: 2,
-    });
-    expect(result).toMatchObject({ total: 2, page: 2, limit: 1 });
-    expect(result.list).toHaveLength(1);
-    expect(result.list[0].currentUserRole).toBe('Observer');
-    expect(requests).toHaveLength(1);
-    expect(new URL(requests[0].url).origin).toBe(
-      'https://warehouse-mocks.invalid',
-    );
-    expect(requests[0].headers.get('X-Warehouse-Demo-Role')).toBe('Observer');
-    expect(new URL(requests[0].url).searchParams.has('role')).toBe(false);
   });
 });

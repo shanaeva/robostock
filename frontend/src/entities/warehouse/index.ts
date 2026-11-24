@@ -1,4 +1,4 @@
-export { createWarehouseDataSource } from './api/data-source';
+export { createWarehouseHttpApi } from './api/http-api';
 export {
   WarehouseApiError,
   getWarehouseErrorMessage,
@@ -6,11 +6,7 @@ export {
 } from './api/errors';
 export { useWarehouses, warehousesQueryKey } from './api/queries';
 export { defaultWarehouseListParams } from './api/types';
-export type {
-  WarehouseDataSource,
-  WarehouseDemoScenario,
-  WarehouseListParams,
-} from './api/types';
+export type { WarehouseDataSource, WarehouseListParams } from './api/types';
 export { warehouseNameSchema, warehouseCreateSchema } from './model/schemas';
 export type {
   WarehouseCreateInput,
@@ -28,4 +24,15 @@ export {
   WAREHOUSE_DIMENSION_MIN,
   WAREHOUSE_DIMENSION_MAX,
 } from './model/constants';
-export { getWarehouseBrowserMockRuntime } from './api/mocks/browser';
+
+const isDevelopment = process.env.NODE_ENV === 'development';
+export const warehouseDataSourceMode =
+  process.env.NEXT_PUBLIC_WAREHOUSE_DATA_SOURCE ?? 'mock';
+export const warehouseMocksEnabled =
+  isDevelopment && warehouseDataSourceMode === 'mock';
+
+export async function loadWarehouseMockHandlers() {
+  const { warehouseMockHandlers } = await import('./api/mocks/handlers');
+
+  return warehouseMockHandlers;
+}

@@ -1,24 +1,15 @@
 import { Search } from 'lucide-react';
-import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import type { WarehouseListParams } from '@/entities/warehouse';
-
-const roleFilters = [
-  { value: 'all', label: 'Все' },
-  { value: 'Owner', label: 'Владелец' },
-  { value: 'Observer', label: 'Наблюдатель' },
-] as const;
 
 const selectClassName =
   'h-9 min-w-0 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-blue-600';
 
 export function WarehouseListControls({
   params,
-  showRoles,
   onChange,
 }: {
   params: WarehouseListParams;
-  showRoles: boolean;
   onChange: (patch: Partial<WarehouseListParams>) => void;
 }) {
   return (
@@ -41,30 +32,6 @@ export function WarehouseListControls({
             onChange={(event) => onChange({ search: event.target.value })}
           />
         </div>
-        {showRoles && (
-          <div
-            role="group"
-            aria-label="Фильтр по роли"
-            className="flex gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1"
-          >
-            {roleFilters.map((filter) => (
-              <Button
-                key={filter.value}
-                size="sm"
-                variant="ghost"
-                aria-pressed={(params.role ?? 'all') === filter.value}
-                className={`h-8 flex-1 px-2 text-xs sm:px-3 sm:text-sm ${(params.role ?? 'all') === filter.value ? 'bg-white text-blue-700 shadow-sm hover:bg-white hover:text-blue-700' : ''}`}
-                onClick={() =>
-                  onChange({
-                    role: filter.value === 'all' ? undefined : filter.value,
-                  })
-                }
-              >
-                {filter.label}
-              </Button>
-            ))}
-          </div>
-        )}
       </div>
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex min-w-0 flex-col gap-1 text-xs text-slate-500">

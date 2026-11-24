@@ -2,10 +2,7 @@ import type {
   WarehouseCreateInput,
   WarehouseRenameInput,
 } from '../model/schemas';
-import type { WarehouseListResult, WarehouseRole } from '../model/types';
-
-export type WarehouseDemoScenario =
-  'default' | 'empty' | 'error' | 'mutation-error' | 'forbidden';
+import type { WarehouseListResult } from '../model/types';
 
 export type WarehouseListParams = {
   search: string;
@@ -13,8 +10,6 @@ export type WarehouseListParams = {
   limit: number;
   sortBy: 'id' | 'name' | 'width' | 'height';
   sortOrder: 'asc' | 'desc';
-  // Demo-only. The HTTP adapter never sends this parameter.
-  role?: WarehouseRole;
 };
 
 export const defaultWarehouseListParams: WarehouseListParams = {
@@ -27,8 +22,6 @@ export const defaultWarehouseListParams: WarehouseListParams = {
 
 export type WarehouseDataSource = {
   readonly mode: 'mock' | 'http';
-  // Releases only this screen's mock handlers; no effect on HTTP data.
-  dispose?: () => void;
   list(
     params: WarehouseListParams,
     signal?: AbortSignal,
@@ -36,7 +29,7 @@ export type WarehouseDataSource = {
   create(input: WarehouseCreateInput): Promise<{ warehouseId: string }>;
   rename(id: string, input: WarehouseRenameInput): Promise<void>;
   remove(id: string): Promise<void>;
-  // Only mocks implement invitations: there is no invitation endpoint in the draft.
+  // Invitations have no HTTP endpoint in the current contract.
   invite?: (
     id: string,
     email: string,
