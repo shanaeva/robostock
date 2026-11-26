@@ -13,6 +13,17 @@ From the repository root, install dependencies:
 pnpm install --frozen-lockfile
 ```
 
+### Environment
+
+Create `frontend/.env.local` from the example:
+
+```bash
+cp -n frontend/.env.example frontend/.env.local
+```
+
+`NEXT_PUBLIC_API_BASE_URL` must point at the backend (port 3001 by default,
+see `backend/.env.example`). The frontend dev server itself runs on port 3000.
+
 ### Development
 
 From the repository root:
@@ -27,11 +38,10 @@ The page automatically updates as you edit files in `src/app/`.
 
 ## Frontend checks
 
-Vitest is provided by the backend workspace. Run the frontend tests from the
-repository root:
+Run the frontend tests from the repository root (the same command CI runs):
 
 ```bash
-pnpm --filter @starter/backend exec vitest run --root ../frontend
+pnpm --filter frontend test
 ```
 
 `vitest.config.mjs` resolves the same `@/` alias as TypeScript. The warehouse

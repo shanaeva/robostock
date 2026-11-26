@@ -10,6 +10,7 @@ import {
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { createWarehouseHttpApi } from './http-api';
+import { invalidateCsrf } from '@/shared/api';
 import { defaultWarehouseListParams } from './types';
 import { warehouseCreateSchema } from '../model/schemas';
 import {
@@ -23,8 +24,23 @@ const warehouseId = '10000000-0000-4000-8000-000000000001';
 const summary = { id: warehouseId, name: 'Основной', width: 32, height: 12 };
 const listBody = { list: [summary], total: 41, page: 2, limit: 20 };
 const api = () => createWarehouseHttpApi('https://api.example.test/v1');
+const csrfToken = 'test-csrf-token';
 
-const server = setupServer();
+const server = setupServer(
+  http.get('https://api.example.test/auth/csrf', () =>
+    HttpResponse.json({ csrfToken }),
+  ),
+  // No active session in these fixtures: refresh-on-401 always fails,
+  // and the original warehouse response should propagate unchanged.
+  http.get(
+    'https://api.example.test/auth/me',
+    () => new HttpResponse(null, { status: 401 }),
+  ),
+  http.post(
+    'https://api.example.test/auth/refresh',
+    () => new HttpResponse(null, { status: 401 }),
+  ),
+);
 const requests = [];
 const unhandled = [];
 
@@ -54,6 +70,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  invalidateCsrf('https://api.example.test');
   requests.length = 0;
   expect(unhandled.splice(0)).toEqual([]);
 });

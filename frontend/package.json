@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "fe": "next dev",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "fsd:check": "steiger ./src"
   },
   "dependencies": {
@@ -28,15 +31,18 @@
     "@feature-sliced/steiger-plugin": "^0.8.2",
     "@stylistic/eslint-plugin": "5.10.0",
     "@tailwindcss/turbopack": "4.3.3",
-    "@types/node": "^20",
+    "@testing-library/react": "16.3.3",
+    "@types/node": "24.19.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
+    "jsdom": "31.0.1",
     "msw": "2.15.0",
     "steiger": "^0.10.0",
     "tailwindcss": "4.3.3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "5.1.0"
   },
   "packageManager": "pnpm@12.18.0",
   "msw": {

@@ -1,7 +1,8 @@
 import { Catch, HttpException, Inject, Logger } from '@nestjs/common';
 import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
-import type { ApiError } from './api-error.schema.js';
+import { apiErrorCodeSchema } from './api-error.schema.js';
+import type { ApiError, ApiErrorCode } from './api-error.schema.js';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -28,12 +29,41 @@ export class HttpExceptionFilter implements ExceptionFilter {
       this.logger.error('HTTP request failed', stack);
     }
 
-    const body: ApiError = { statusCode: status, message };
+    const code = this.resolveCode(exception, status);
+    const body: ApiError = {
+      statusCode: status,
+      message,
+      ...(code && { code }),
+    };
     this.adapterHost.httpAdapter.reply(
       host.switchToHttp().getResponse<unknown>(),
       body,
       status,
     );
+  }
+
+  /**
+   * Machine-readable code the client branches on (e.g. CSRF_REJECTED drives
+   * the token refetch-and-retry). Only whitelisted codes from a 4xx
+   * HttpException are forwarded, so 5xx internals never leak.
+   */
+  private resolveCode(
+    exception: unknown,
+    status: number,
+  ): ApiErrorCode | undefined {
+    if (!(exception instanceof HttpException) || status >= 500) {
+      return undefined;
+    }
+
+    const response = exception.getResponse();
+
+    if (typeof response !== 'object' || !('code' in response)) {
+      return undefined;
+    }
+
+    const parsed = apiErrorCodeSchema.safeParse(response.code);
+
+    return parsed.success ? parsed.data : undefined;
   }
 
   private resolveMessage(exception: unknown, status: number): string {

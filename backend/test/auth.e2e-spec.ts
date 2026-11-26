@@ -259,4 +259,116 @@ describe('Auth API with PostgreSQL', () => {
       expect(meRes.status).toBe(401);
     });
   });
+
+  describe('CSRF contract', () => {
+    // The frontend branches on `code` to refetch the token and retry once
+    // (see frontend/src/shared/api/client.ts), so it must survive the
+    // global exception filter.
+    it('отдаёт 403 с машинным кодом CSRF_REJECTED без заголовка', async () => {
+      const res = await request(server).post('/auth/logout');
+
+      expect(res.status).toBe(403);
+      expect(res.body).toMatchObject({
+        statusCode: 403,
+        code: 'CSRF_REJECTED',
+      });
+      expect(typeof (res.body as { message: unknown }).message).toBe('string');
+    });
+
+    it('отдаёт 403 с кодом CSRF_REJECTED при несовпадении токена и cookie', async () => {
+      const { cookie } = await getCsrf();
+      const res = await request(server)
+        .post('/auth/logout')
+        .set('Cookie', cookie)
+        .set('X-CSRF-Token', 'stale-token');
+
+      expect(res.status).toBe(403);
+      expect((res.body as { code?: string }).code).toBe('CSRF_REJECTED');
+    });
+
+    it('не раскрывает код для внутренних ошибок', async () => {
+      const res = await request(server).get('/auth/me');
+
+      expect(res.status).toBe(401);
+      expect(res.body).not.toHaveProperty('code');
+    });
+  });
+
+  describe('POST /auth/refresh', () => {
+    function cookieValue(cookies: string[], name: string): string {
+      const found = cookies.find((c) => c.startsWith(`${name}=`)) ?? '';
+
+      return found.split(';')[0] ?? '';
+    }
+
+    it('выдаёт новый access-токен по refresh-cookie, когда access истёк', async () => {
+      await register();
+      await verifyAndSetPassword();
+      const loginRes = await login();
+      const issued = loginRes.headers['set-cookie'] as unknown as string[];
+      const refreshCookie = cookieValue(issued, 'refresh_token');
+
+      // Only the refresh cookie survives — the same state as an expired access token.
+      const staleMe = await request(server)
+        .get('/auth/me')
+        .set('Cookie', refreshCookie);
+      expect(staleMe.status).toBe(401);
+
+      const { cookie: csrfCookie, token } = await getCsrf();
+      const refreshRes = await request(server)
+        .post('/auth/refresh')
+        .set('Cookie', `${refreshCookie}; ${csrfCookie.split(';')[0] ?? ''}`)
+        .set('X-CSRF-Token', token);
+
+      expect(refreshRes.status).toBe(200);
+      const renewed = refreshRes.headers['set-cookie'] as unknown as string[];
+      const newAccess = cookieValue(renewed, 'access_token');
+      expect(newAccess).not.toBe('access_token=');
+
+      const meRes = await request(server)
+        .get('/auth/me')
+        .set('Cookie', newAccess);
+      expect(meRes.status).toBe(200);
+      expect((meRes.body as { user: { email: string } }).user.email).toBe(
+        REGISTER_INPUT.email,
+      );
+    });
+
+    it('возвращает 401 и чистит cookie при отсутствии refresh-токена', async () => {
+      const { cookie: csrfCookie, token } = await getCsrf();
+      const res = await request(server)
+        .post('/auth/refresh')
+        .set('Cookie', csrfCookie.split(';')[0] ?? '')
+        .set('X-CSRF-Token', token);
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe('POST /auth/logout-all', () => {
+    it('инвалидирует все сессии пользователя', async () => {
+      await register();
+      await verifyAndSetPassword();
+      const firstCookies = (
+        (await login()).headers['set-cookie'] as unknown as string[]
+      ).join('; ');
+      const secondCookies = (
+        (await login()).headers['set-cookie'] as unknown as string[]
+      ).join('; ');
+
+      const { cookie: csrfCookie, token } = await getCsrf();
+      const res = await request(server)
+        .post('/auth/logout-all')
+        .set('Cookie', `${secondCookies}; ${csrfCookie.split(';')[0] ?? ''}`)
+        .set('X-CSRF-Token', token);
+      expect(res.status).toBe(200);
+
+      for (const cookies of [firstCookies, secondCookies]) {
+        const meRes = await request(server)
+          .get('/auth/me')
+          .set('Cookie', cookies);
+        expect(meRes.status).toBe(401);
+      }
+    });
+  });
 });

@@ -12,6 +12,7 @@
     "dc": "docker compose -f ../compose.yaml up -d",
     "dc:d": "docker compose -f ../compose.yaml down",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:reset-admin-password": "tsx prisma/seed.ts --reset-admin-password",
     "db:studio": "prisma studio",
     "be": "nest start --watch",
     "bd": "nest build",
