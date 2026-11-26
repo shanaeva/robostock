@@ -1,25 +1,41 @@
-const API = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
+// Cached per origin: auth and entity API clients may target different
+// backends (e.g. a real API origin vs. the warehouse mock origin).
+const cache = new Map<string, string>();
+// Concurrent unsafe requests to one origin share a single /auth/csrf call.
+const inFlight = new Map<string, Promise<string>>();
 
-let cached: string | null = null;
+export async function getCsrfToken(origin: string): Promise<string> {
+  const cached = cache.get(origin);
 
-export async function getCsrfToken(): Promise<string> {
   if (cached) {
     return cached;
   }
 
-  const res = await fetch(`${API}/auth/csrf`, { credentials: 'include' });
+  const pending = inFlight.get(origin);
 
-  if (!res.ok) {
-    throw new Error('Failed to fetch CSRF token');
+  if (pending) {
+    return pending;
   }
 
-  const data = (await res.json()) as { csrfToken: string };
+  const request = (async () => {
+    const res = await fetch(`${origin}/auth/csrf`, { credentials: 'include' });
 
-  cached = data.csrfToken;
+    if (!res.ok) {
+      throw new Error('Failed to fetch CSRF token');
+    }
 
-  return cached;
+    const data = (await res.json()) as { csrfToken: string };
+    cache.set(origin, data.csrfToken);
+
+    return data.csrfToken;
+  })().finally(() => inFlight.delete(origin));
+
+  inFlight.set(origin, request);
+
+  return request;
 }
 
-export function invalidateCsrf(): void {
-  cached = null;
+export function invalidateCsrf(origin: string): void {
+  cache.delete(origin);
+  inFlight.delete(origin);
 }

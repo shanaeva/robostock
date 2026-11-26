@@ -5,9 +5,12 @@ export default async function LoginRoute({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { email } = await searchParams;
+  const { email, from } = await searchParams;
 
   return (
-    <LoginPage defaultEmail={typeof email === 'string' ? email : undefined} />
+    <LoginPage
+      defaultEmail={typeof email === 'string' ? email : undefined}
+      from={typeof from === 'string' ? from : undefined}
+    />
   );
 }

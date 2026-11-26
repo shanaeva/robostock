@@ -9,7 +9,7 @@ const PUBLIC_PATHS = [
 ];
 
 export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
 
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
@@ -19,7 +19,8 @@ export function proxy(request: NextRequest) {
 
   if (!token) {
     const loginUrl = new URL('/auth/login', request.url);
-    loginUrl.searchParams.set('from', pathname);
+    // Keep the query string so e.g. /warehouses?page=3 is restored exactly.
+    loginUrl.searchParams.set('from', `${pathname}${search}`);
 
     return NextResponse.redirect(loginUrl);
   }

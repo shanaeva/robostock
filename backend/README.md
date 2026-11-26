@@ -15,6 +15,10 @@ cp -n .env.example .env
 cp -n backend/.env.example backend/.env
 docker compose up -d --wait
 
+# Сгенерировать секреты авторизации (JWT_SECRET, AUTH_CODE_SECRET, CSRF_SECRET)
+# и вписать их в backend/.env вместо заглушек change_me_...
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+
 # Миграции и запуск бэкенда
 pnpm --filter backend db:deploy
 pnpm --filter backend start:dev

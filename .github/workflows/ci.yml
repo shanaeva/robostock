@@ -44,6 +44,9 @@ jobs:
       - name: FSD architecture check
         run: pnpm --filter frontend fsd:check
 
+      - name: Tests
+        run: pnpm --filter frontend test
+
       - name: Build
         run: pnpm --filter frontend build
 

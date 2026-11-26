@@ -11,7 +11,13 @@ type FormValues = {
   rememberMe: boolean;
 };
 
-export function LoginForm({ defaultEmail }: { defaultEmail?: string }) {
+export function LoginForm({
+  defaultEmail,
+  from,
+}: {
+  defaultEmail?: string;
+  from?: string;
+}) {
   const { register, handleSubmit, reset, control } = useForm<FormValues>({
     defaultValues: { rememberMe: false },
   });
@@ -24,7 +30,7 @@ export function LoginForm({ defaultEmail }: { defaultEmail?: string }) {
     }
   }, [defaultEmail, reset]);
 
-  const { mutate: login, isPending, error } = useLogin();
+  const { mutate: login, isPending, error } = useLogin(from);
 
   const errorMessage = getErrorMessage(error);
 

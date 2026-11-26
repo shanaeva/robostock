@@ -1,4 +1,4 @@
-export { useLogin, useRegister, useLogout } from './model';
+export { useLogin, useRegister, useLogout, getErrorMessage } from './model';
 export {
   useGetSettings,
   useResendVerification,

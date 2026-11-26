@@ -31,7 +31,23 @@ function hashPassword(password: string): Promise<string> {
   });
 }
 
+// Re-running the seed must not clobber a password the admin changed since.
+// Pass --reset-admin-password to force it back to ADMIN_PASSWORD explicitly.
+const resetPassword = process.argv.includes('--reset-admin-password');
+
 async function main() {
+  const existing = await prisma.user.findUnique({
+    where: { email: ADMIN_EMAIL },
+    select: { id: true },
+  });
+
+  if (existing && !resetPassword) {
+    console.warn('Admin user already present, password left untouched');
+
+    return;
+  }
+
+  // scrypt at N=131072 is deliberately slow, so hash only when it is used.
   const passwordHash = await hashPassword(ADMIN_PASSWORD);
   await prisma.user.upsert({
     where: { email: ADMIN_EMAIL },
@@ -44,7 +60,7 @@ async function main() {
       verifiedAt: new Date(),
     },
   });
-  console.warn('Admin user seeded');
+  console.warn(resetPassword ? 'Admin password reset' : 'Admin user seeded');
 }
 
 main()

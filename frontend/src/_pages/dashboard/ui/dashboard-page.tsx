@@ -1,11 +1,12 @@
 'use client';
 
 import { useGetMe } from '@/entities/user';
-import { useLogout } from '@/features/auth';
+import { getErrorMessage, useLogout } from '@/features/auth';
 
 export function DashboardPage() {
   const { data, isLoading, isError } = useGetMe();
-  const { mutate: logout, isPending } = useLogout();
+  const { mutate: logout, isPending, error: logoutError } = useLogout();
+  const logoutErrorMessage = getErrorMessage(logoutError);
 
   if (isLoading) {
     return (
@@ -69,12 +70,20 @@ export function DashboardPage() {
           </tbody>
         </table>
 
+        {logoutErrorMessage && (
+          <p className="text-sm text-red-600 dark:text-red-400">
+            {logoutErrorMessage}
+          </p>
+        )}
+
         <button
           onClick={() => logout()}
           disabled={isPending}
           className="bg-black text-white rounded px-4 py-2 font-medium hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
         >
-          {isPending ? 'Выходим...' : 'Выйти'}
+          {isPending && 'Выходим...'}
+          {!isPending && logoutError && 'Повторить выход'}
+          {!isPending && !logoutError && 'Выйти'}
         </button>
       </div>
     </main>
