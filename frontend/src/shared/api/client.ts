@@ -79,11 +79,9 @@ async function tryRefresh(origin: string): Promise<boolean> {
       return true;
     }
 
-    const refreshRes = await rawFetch(
-      `${origin}/auth/refresh`,
-      { method: 'POST' },
-      true,
-    );
+    const refreshRes = await fetchWithCsrfRecovery(`${origin}/auth/refresh`, {
+      method: 'POST',
+    });
 
     if (refreshRes.ok) {
       invalidateCsrf(origin);
@@ -114,26 +112,33 @@ async function isCsrfRejected(res: Response): Promise<boolean> {
   }
 }
 
-// Shared by the auth client and entity API clients: attaches the CSRF header
-// to unsafe methods and retries once through a session refresh on 401.
-export async function authorizedFetch(
+// Also used by the internal refresh request. This helper never refreshes the
+// session itself, so a failed refresh cannot recursively start another one.
+async function fetchWithCsrfRecovery(
   input: string | URL,
-  init: RequestInit = {},
+  init: RequestInit,
 ): Promise<Response> {
   const method = (init.method ?? 'GET').toUpperCase();
   const needsCsrf = !SAFE_METHODS.has(method);
 
   let res = await rawFetch(input, init, needsCsrf);
 
-  const { origin, pathname } = toURL(input);
-
-  // A stale csrf_token cookie (expired or rotated in another tab) makes the
-  // cached header value stale too — including on /auth/login and /auth/refresh,
-  // which NO_REFRESH_PATHS below otherwise never retries. Refetch and retry once.
   if (needsCsrf && res.status === 403 && (await isCsrfRejected(res))) {
-    invalidateCsrf(origin);
+    invalidateCsrf(toURL(input).origin);
     res = await rawFetch(input, init, needsCsrf);
   }
+
+  return res;
+}
+
+// Shared by the auth client and entity API clients: attaches the CSRF header
+// to unsafe methods and retries once through a session refresh on 401.
+export async function authorizedFetch(
+  input: string | URL,
+  init: RequestInit = {},
+): Promise<Response> {
+  let res = await fetchWithCsrfRecovery(input, init);
+  const { origin, pathname } = toURL(input);
 
   if (res.status === 401 && !isNoRefreshPath(pathname)) {
     let refresh = refreshing.get(origin);
@@ -144,7 +149,7 @@ export async function authorizedFetch(
     }
 
     if (await refresh) {
-      res = await rawFetch(input, init, needsCsrf);
+      res = await fetchWithCsrfRecovery(input, init);
     }
   }
 

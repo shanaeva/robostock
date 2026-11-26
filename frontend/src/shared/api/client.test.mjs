@@ -4,7 +4,7 @@ import {
   createHttpClient,
   HttpClientConfigurationError,
 } from './client';
-import { invalidateCsrf } from './csrf';
+import { getCsrfToken, invalidateCsrf } from './csrf';
 
 const ORIGIN = 'https://api.example.test';
 const CSRF_TOKEN = 'test-csrf-token';
@@ -275,6 +275,52 @@ describe('shared HTTP transport', () => {
   });
 
   describe('session refresh on 401', () => {
+    it.each([true, false])(
+      'recovers stale CSRF during automatic refresh (recovery succeeds: %s)',
+      async (recoverySucceeds) => {
+        let csrfCalls = 0;
+        let refreshCalls = 0;
+        let refreshed = false;
+        const fetchMock = vi.fn(async (input, init = {}) => {
+          const href = String(input);
+
+          if (href === `${ORIGIN}/auth/csrf`) {
+            csrfCalls += 1;
+
+            return Response.json({ csrfToken: `token-${csrfCalls}` });
+          }
+
+          if (href === `${ORIGIN}/auth/refresh`) {
+            refreshCalls += 1;
+            const token = new Headers(init.headers).get('X-CSRF-Token');
+
+            if (token === 'token-1' || !recoverySucceeds) {
+              return Response.json({ code: 'CSRF_REJECTED' }, { status: 403 });
+            }
+
+            expect(token).toBe('token-2');
+            refreshed = true;
+
+            return Response.json({});
+          }
+
+          expect(href).toBe(`${ORIGIN}/auth/me`);
+
+          return Response.json({}, { status: refreshed ? 200 : 401 });
+        });
+        vi.stubGlobal('fetch', fetchMock);
+        // The header remains cached after its corresponding cookie expires.
+        await getCsrfToken(ORIGIN);
+
+        const response = await authorizedFetch(`${ORIGIN}/auth/me`);
+
+        expect(response.status).toBe(recoverySucceeds ? 200 : 401);
+        expect(csrfCalls).toBe(2);
+        expect(refreshCalls).toBe(2);
+        expect(fetchMock).toHaveBeenCalledTimes(recoverySucceeds ? 7 : 6);
+      },
+    );
+
     function stubSequence(responses) {
       const fetchMock = vi.fn((input) => {
         const href = input instanceof Request ? input.url : String(input);
