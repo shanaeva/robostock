@@ -1,51 +1,42 @@
-## Getting Started
+## Запуск
 
-### Prerequisites
+### Требования
 
 - Node.js
 - pnpm
 
-### Installation
+### Установка
 
-From the repository root, install dependencies:
+Установите зависимости из корня репозитория:
 
 ```bash
 pnpm install --frozen-lockfile
 ```
 
-### Environment
+### Окружение
 
-Create `frontend/.env.local` from the example:
+Создайте `frontend/.env.local` из примера:
 
 ```bash
 cp -n frontend/.env.example frontend/.env.local
 ```
 
-`NEXT_PUBLIC_API_BASE_URL` must point at the backend (port 3001 by default,
-see `backend/.env.example`). The frontend dev server itself runs on port 3000.
+`NEXT_PUBLIC_API_BASE_URL` должен указывать на бэкенд (по умолчанию порт 3001,
+см. `backend/.env.example`). Сервер разработки фронтенда работает на порту 3000.
 
-### Development
+### Разработка
 
-From the repository root:
+Запустите фронтенд из корня репозитория:
 
 ```bash
 pnpm --filter frontend dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to see the application.
+Откройте [http://localhost:3000](http://localhost:3000).
 
-The page automatically updates as you edit files in `src/`.
+Страница автоматически обновляется при изменении файлов в `src/`.
 
-## Frontend checks
-
-Run the frontend tests from the repository root (the same command CI runs):
-
-```bash
-pnpm --filter frontend test
-```
-
-`vitest.config.mjs` resolves the same `@/` alias as TypeScript. The warehouse
-screen's structure and data modes are described in
+Структура экрана складов и режимы работы с данными описаны в
 [`src/_pages/warehouses/README.md`](src/_pages/warehouses/README.md).
 
 ## Структура проекта
@@ -57,16 +48,23 @@ src/
 ├── app/                 # Маршруты Next.js, layout и инициализация
 │   ├── layout.tsx
 │   ├── page.tsx         # Маршрут /, подключает HomePage
+│   ├── auth/            # Маршруты авторизации
+│   ├── dashboard/page.tsx
 │   ├── warehouses/page.tsx
+│   ├── providers.tsx    # Провайдеры приложения
 │   └── styles/          # Глобальные стили
 ├── _pages/              # Сборка страниц
+│   ├── auth/            # Экраны авторизации
+│   ├── dashboard/       # Профиль пользователя
 │   ├── home/            # Стартовый экран
 │   └── warehouses/      # Страница складов
 ├── widgets/             # Крупные блоки интерфейса
 │   └── warehouse-management/
 ├── features/            # Пользовательские действия
+│   ├── auth/
 │   └── manage-warehouse/
 ├── entities/            # Предметные данные, схемы и запросы
+│   ├── user/
 │   └── warehouse/
 └── shared/              # Общие UI-компоненты, утилиты и HTTP-транспорт
 ```
@@ -79,9 +77,11 @@ src/
 export { HomePage as default } from '@/_pages/home';
 ```
 
-В `app` остаются маршруты, metadata, разбор route params и searchParams,
-layout и инициализация приложения. UI и предметную логику размещаем в FSD-слоях.
-В `app` также могут появиться `providers` и типы уровня приложения в `types`.
+В `app` остаются маршруты, метаданные, разбор параметров маршрута и `searchParams`,
+общие макеты и инициализация приложения. Интерфейс и предметную логику размещаем
+в FSD-слоях.
+Провайдеры приложения находятся в `app/providers.tsx`; типы уровня приложения
+при необходимости размещаем в `app/types`.
 Предметные типы храним рядом с соответствующей логикой. Отдельный `_app`
 и пустые папки заранее не создаём.
 
@@ -99,15 +99,21 @@ layout и инициализация приложения. UI и предмет�
 
 ## Проверки
 
-Из корня workspace:
+Все команды выполняются из корня репозитория:
 
 ```bash
+pnpm --filter frontend test
+pnpm exec prettier --check frontend/src frontend/README.md frontend/vitest.config.mjs
 pnpm --filter frontend fsd:check
 pnpm --filter frontend lint
 pnpm --filter frontend exec next typegen
 pnpm --filter frontend exec tsc --noEmit --incremental false
 pnpm --filter frontend build
 ```
+
+Тесты фронтенда запускаются через собственную команду `test`, как и в CI.
+Конфигурация `vitest.config.mjs` поддерживает тот же псевдоним `@/`, что и TypeScript.
+Перед сборкой остановите сервер разработки фронтенда.
 
 Steiger проверяет архитектуру FSD с рекомендуемыми правилами, включая ограничения
 импортов и публичные API. FSD-проверка также выполняется перед коммитом и в CI.
@@ -116,7 +122,6 @@ Steiger проверяет архитектуру FSD с рекомендуем�
 опечаткой. Оно отключено только для `src/_pages/**`; остальные правила для этого
 слоя остаются включёнными.
 
-`fsd/insignificant-slice` работает как предупреждение: у тонкой страницы может
-быть единственный виджет, а у виджета — единственная feature. Это не блокирует
-коммит; ограничения импортов и публичных API остаются ошибками. Steiger не
-проверяет, насколько тонким остался маршрут Next.js: это проверяем на ревью.
+`fsd/insignificant-slice` временно отключено на этапе разработки срезов.
+Ограничения импортов и публичных API остаются ошибками. Каталог `src/app/**`
+исключён из проверки Steiger, поэтому тонкость маршрутов проверяем на ревью.
