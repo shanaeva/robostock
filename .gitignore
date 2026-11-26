@@ -130,6 +130,9 @@ dist
 # Stores Visual Studio Code versions used for testing Visual Studio Code extensions
 .vscode-test
 
+# JetBrains IDE settings
+.idea/
+
 # pnpm
 .pnpm-store
 

@@ -1,49 +1,127 @@
-## Getting Started
+## Запуск
 
-### Prerequisites
+### Требования
 
 - Node.js
 - pnpm
 
-### Installation
+### Установка
 
-From the repository root, install dependencies:
+Установите зависимости из корня репозитория:
 
 ```bash
 pnpm install --frozen-lockfile
 ```
 
-### Environment
+### Окружение
 
-Create `frontend/.env.local` from the example:
+Создайте `frontend/.env.local` из примера:
 
 ```bash
 cp -n frontend/.env.example frontend/.env.local
 ```
 
-`NEXT_PUBLIC_API_BASE_URL` must point at the backend (port 3001 by default,
-see `backend/.env.example`). The frontend dev server itself runs on port 3000.
+`NEXT_PUBLIC_API_BASE_URL` должен указывать на бэкенд (по умолчанию порт 3001,
+см. `backend/.env.example`). Сервер разработки фронтенда работает на порту 3000.
 
-### Development
+### Разработка
 
-From the repository root:
+Запустите фронтенд из корня репозитория:
 
 ```bash
 pnpm --filter frontend dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to see the application.
+Откройте [http://localhost:3000](http://localhost:3000).
 
-The page automatically updates as you edit files in `src/app/`.
+Страница автоматически обновляется при изменении файлов в `src/`.
 
-## Frontend checks
+Структура экрана складов и режимы работы с данными описаны в
+[`src/_pages/warehouses/README.md`](src/_pages/warehouses/README.md).
 
-Run the frontend tests from the repository root (the same command CI runs):
+## Структура проекта
+
+Используем Next.js App Router и Feature-Sliced Design (FSD):
+
+```text
+src/
+├── app/                 # Маршруты Next.js, layout и инициализация
+│   ├── layout.tsx
+│   ├── page.tsx         # Маршрут /, подключает HomePage
+│   ├── auth/            # Маршруты авторизации
+│   ├── dashboard/page.tsx
+│   ├── warehouses/page.tsx
+│   ├── providers.tsx    # Провайдеры приложения
+│   └── styles/          # Глобальные стили
+├── _pages/              # Сборка страниц
+│   ├── auth/            # Экраны авторизации
+│   ├── dashboard/       # Профиль пользователя
+│   ├── home/            # Стартовый экран
+│   └── warehouses/      # Страница складов
+├── widgets/             # Крупные блоки интерфейса
+│   └── warehouse-management/
+├── features/            # Пользовательские действия
+│   ├── auth/
+│   └── manage-warehouse/
+├── entities/            # Предметные данные, схемы и запросы
+│   ├── user/
+│   └── warehouse/
+└── shared/              # Общие UI-компоненты, утилиты и HTTP-транспорт
+```
+
+`app` содержит файлы маршрутизации Next.js. Содержимое экранов находится в
+`_pages`: префикс предотвращает конфликт с Pages Router. Маршрут подключает
+экран через публичный API, например:
+
+```tsx
+export { HomePage as default } from '@/_pages/home';
+```
+
+В `app` остаются маршруты, метаданные, разбор параметров маршрута и `searchParams`,
+общие макеты и инициализация приложения. Интерфейс и предметную логику размещаем
+в FSD-слоях.
+Провайдеры приложения находятся в `app/providers.tsx`; типы уровня приложения
+при необходимости размещаем в `app/types`.
+Предметные типы храним рядом с соответствующей логикой. Отдельный `_app`
+и пустые папки заранее не создаём.
+
+Внутри среза используем сегменты по назначению: `ui` для компонентов, `model`
+для состояния и правил, `api` для запросов и адаптеров. Создаём только нужные
+сегменты. Срез экспортирует доступные извне компоненты, функции и типы через
+корневой `index.ts`; между срезами импортируем из этого публичного API,
+например `@/entities/warehouse`, без обращения к внутренним файлам.
+
+Направление зависимостей: `_pages` → `widgets` → `features` → `entities` →
+`shared`. Можно пропускать промежуточные слои, но нельзя импортировать верхний
+слой из нижнего или один срез из другого на том же слое. Внутри среза используем
+относительные импорты. В `shared` размещаем общий код без логики конкретного
+предметного сценария.
+
+## Проверки
+
+Все команды выполняются из корня репозитория:
 
 ```bash
 pnpm --filter frontend test
+pnpm exec prettier --check frontend/src frontend/README.md frontend/vitest.config.mjs
+pnpm --filter frontend fsd:check
+pnpm --filter frontend lint
+pnpm --filter frontend exec next typegen
+pnpm --filter frontend exec tsc --noEmit --incremental false
+pnpm --filter frontend build
 ```
 
-`vitest.config.mjs` resolves the same `@/` alias as TypeScript. The warehouse
-screen's structure and data modes are described in
-[`src/_pages/warehouses/README.md`](src/_pages/warehouses/README.md).
+Тесты фронтенда запускаются через собственную команду `test`, как и в CI.
+Конфигурация `vitest.config.mjs` поддерживает тот же псевдоним `@/`, что и TypeScript.
+Перед сборкой остановите сервер разработки фронтенда.
+
+Steiger проверяет архитектуру FSD с рекомендуемыми правилами, включая ограничения
+импортов и публичные API. FSD-проверка также выполняется перед коммитом и в CI.
+
+В версии плагина 0.8.2 правило `fsd/typo-in-layer-name` ошибочно считает `_pages`
+опечаткой. Оно отключено только для `src/_pages/**`; остальные правила для этого
+слоя остаются включёнными.
+
+`fsd/insignificant-slice` временно отключено на этапе разработки срезов.
+Ограничения импортов и публичных API остаются ошибками. Каталог `src/app/**`
+исключён из проверки Steiger, поэтому тонкость маршрутов проверяем на ревью.
