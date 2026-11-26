@@ -1,63 +1,61 @@
 # My Warehouses — /warehouses
 
-Warehouse listing, search, sorting, pagination, creation, renaming,
-and deletion. Names must contain 1–100 characters; dimensions must be integers from 1 to 500.
+Warehouse list and management forms. Names contain 1–100 characters after trimming;
+dimensions are integers from 1 to 500, initially 20×20.
 
-## Getting Started
+## Development
 
-See the [frontend README](../../../README.md) for instructions.
-After starting the application, open `/warehouses`.
+See the [frontend README](../../../README.md). From the repository root:
 
-Configure the following variables in `frontend/.env.local`:
+```sh
+pnpm --filter frontend dev
+```
 
-| Variable                            | Purpose                                                           |
-| ----------------------------------- | ----------------------------------------------------------------- |
-| `NEXT_PUBLIC_WAREHOUSE_DATA_SOURCE` | `mock` (default) or `http`                                        |
-| `NEXT_PUBLIC_API_BASE_URL`          | API URL, required for `http`                                      |
-| `NEXT_PUBLIC_WAREHOUSE_DEMO_OWNER`  | `true` enables temporary owner actions only in development + http |
+Open /warehouses. Public settings (restart dev after changes):
 
-Restart the dev server after changing these variables; production requires
-a rebuild. `NEXT_PUBLIC_*` variables are public; do not store secrets in them.
+| Variable                          | Default  | Purpose                                                               |
+| --------------------------------- | -------- | --------------------------------------------------------------------- |
+| NEXT_PUBLIC_WAREHOUSE_DATA_SOURCE | mock     | mock or http                                                          |
+| NEXT_PUBLIC_API_BASE_URL          | none     | API base URL, required for http; supports a path prefix               |
+| NEXT_PUBLIC_WAREHOUSE_DEMO_OWNER  | disabled | Exact true enables temporary rename/delete only in development + http |
 
-## Modes
+## Data modes
 
-- **mock** — works without a backend; changes are reset on page reload.
-  Scenarios: `?demo=empty`, `?demo=error`, `?demo=mutation-error`,
-  `?demo=forbidden`. Invitations are simulated.
-- **http** — sends requests to the real API without falling back to mocks on errors.
-  Owner actions are hidden when the role is unknown. The temporary flag
-  enables renaming and deletion but does not change server-side permissions
-  and is ignored in production. HTTP invitations are disabled.
+In development, **mock** starts MSW once at the app route boundary before mounting
+the warehouse screen. Requests use the same HTTP adapter and response schemas as
+HTTP mode and target https://warehouse-mocks.invalid. Startup errors are displayed
+without sending mock requests to the configured backend.
 
-## Structure
+The shared handlers return fixed responses: GET returns four prepared warehouses,
+POST returns a fixed warehouseId with status 201, PATCH and DELETE return empty
+204 responses. Writes do not change the list. Search, sorting and pagination
+parameters are not simulated; request validation is the backend's responsibility.
+There is no mutable mock store, local role assignment, role filter, invitation
+simulation or URL-based demo scenario. Reloading returns the same fixture.
 
-The page composes `WarehouseManagement` through its public API. Implementation
-is split into FSD slices:
+**http** uses NEXT_PUBLIC_API_BASE_URL without falling back to mocks. Test complete
+CRUD, search, sorting and pagination with a suitable backend. Real sessions,
+warehouse roles and HTTP invitations remain pending frontend integrations.
+Unknown roles do not grant owner permissions. The existing temporary Owner flag
+does not change DTOs or server permissions and is ignored in production.
 
-- `widgets/warehouse-management` — screen composition, filters, pagination,
-  action selection, notices, and a local QueryClient and data-source instance.
-- `features/manage-warehouse` — action dialog, forms, invitation validation,
-  mutations, and list invalidation after successful commands.
-- `entities/warehouse` — warehouse types, input and response schemas, query
-  keys, list queries, and HTTP/mock adapters. It does not depend on form types.
-- `shared/api` — HTTP URL validation and transport; warehouse contracts and
-  user-facing error messages remain in `entities/warehouse`.
+MSW only starts in development + mock. Production mock mode displays a configuration
+error; the default remains mock, so explicitly set http and the API URL **before
+building**. Restart dev and reload the page when switching modes. The worker uses
+its own /warehouses scope and script URL; unrelated service workers are untouched.
 
-Each slice exposes an `index.ts`; imports between layers use these public APIs.
-The cache and mock data retain their lifetime per mounted screen.
+## Tests and worker
 
-The widget and feature currently have one consuming slice each. Under the
-thin-page convention, `fsd/insignificant-slice` is advisory (`warn`), so it still
-reports candidates for merging without blocking this separation. Import
-boundaries and public API checks remain errors.
+Browser startup is in src/app/mocks/browser.ts. Warehouse handlers are in
+src/entities/warehouse/api/mocks/handlers.ts and are shared with Node setupServer.
+Use server.use(...) in tests for empty, error or malformed responses; reset handlers
+after each test. Static mocks do not confirm real backend integration or E2E flows.
 
-## Checks
-
-Run from the repository root:
+From the repository root:
 
 ```sh
 pnpm --filter @starter/backend exec vitest run --root ../frontend
-pnpm exec prettier --check frontend/src frontend/vitest.config.mjs
+pnpm format:check
 pnpm --filter frontend lint
 pnpm --filter frontend fsd:check
 pnpm --filter frontend exec next typegen
@@ -65,10 +63,10 @@ pnpm --filter frontend exec tsc --noEmit --incremental false
 pnpm --filter frontend build
 ```
 
-Stop the frontend dev server before running the build.
-Tests use Vitest from the backend and mocked requests; they are not E2E tests.
+Stop frontend dev before building. The generated public/mockServiceWorker.js must
+not be edited for business logic. After an intentional MSW upgrade:
 
-## Pending Integrations
-
-- Authentication, real roles, and state updates when the session changes.
-- Warehouse editor route — the “Open” button is currently unavailable.
+```sh
+pnpm --filter frontend exec msw init public --save
+pnpm exec prettier --write frontend/public/mockServiceWorker.js
+```
