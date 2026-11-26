@@ -122,7 +122,7 @@ describe('warehouse response schemas', () => {
     const details = {
       ...summary,
       ownerId,
-      robots: [{ id: ownerId, name: 'Robot 1' }],
+      robots: [{ id: ownerId, name: 'Robot 1', x: 3, y: 5 }],
       obstacles: [{ id: ownerId, x: 0, y: 5 }],
       stations: [
         { id: ownerId, name: 'Station 1', x: 3, y: 4, direction: 'north' },
@@ -135,6 +135,12 @@ describe('warehouse response schemas', () => {
     expect(
       warehouseDetailsSchema.safeParse({ ...details, updatedAt: 'invalid' })
         .success,
+    ).toBe(false);
+    expect(
+      warehouseDetailsSchema.safeParse({
+        ...details,
+        robots: [{ id: ownerId, name: 'Robot without coordinates' }],
+      }).success,
     ).toBe(false);
     expect(
       warehouseDetailsSchema.safeParse({

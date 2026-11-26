@@ -8,6 +8,7 @@ import { HealthController } from './health.controller.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { WarehouseMapModule } from './modules/warehouse-map/warehouse-map.module.js';
 import { WarehousesModule } from './modules/warehouses/warehouses.module.js';
 
 @Module({
@@ -23,6 +24,7 @@ import { WarehousesModule } from './modules/warehouses/warehouses.module.js';
     AuthModule,
     UsersModule,
     WarehousesModule,
+    WarehouseMapModule,
   ],
   controllers: [HealthController],
   providers: [

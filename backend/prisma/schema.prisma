@@ -15,6 +15,13 @@ enum CodePurpose {
   RESET_PASSWORD
 }
 
+enum StationDirection {
+  north
+  south
+  east
+  west
+}
+
 enum UserRole {
   ADMIN
   USER
@@ -92,6 +99,54 @@ model Warehouse {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
+  obstacles Obstacle[]
+  stations  Station[]
+  robots    Robot[]
+
   @@unique([ownerId, name])
   @@map("warehouses")
+}
+
+// Cell occupancy across obstacles, stations and robots is enforced by the
+// service under a Warehouse row lock; unique indexes only guard each table.
+model Obstacle {
+  id          String   @id @default(uuid()) @db.Uuid
+  warehouseId String   @db.Uuid
+  x           Int
+  y           Int
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([warehouseId, x, y])
+  @@map("obstacles")
+}
+
+model Station {
+  id          String           @id @default(uuid()) @db.Uuid
+  warehouseId String           @db.Uuid
+  name        String           @db.VarChar(100)
+  direction   StationDirection
+  x           Int
+  y           Int
+  createdAt   DateTime         @default(now()) @db.Timestamptz(3)
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([warehouseId, x, y])
+  @@map("stations")
+}
+
+model Robot {
+  id          String   @id @default(uuid()) @db.Uuid
+  warehouseId String   @db.Uuid
+  name        String   @db.VarChar(100)
+  x           Int
+  y           Int
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([warehouseId, x, y])
+  @@map("robots")
 }

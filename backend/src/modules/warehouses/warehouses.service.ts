@@ -11,9 +11,23 @@ import type {
 } from './warehouses.schemas.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { Prisma } from '../../generated/prisma/client.js';
-import type { Warehouse } from '../../generated/prisma/client.js';
 
 const NOT_FOUND = 'Склад не найден.';
+
+const mapObjects = {
+  robots: {
+    select: { id: true, name: true, x: true, y: true },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  },
+  obstacles: {
+    select: { id: true, x: true, y: true },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  },
+  stations: {
+    select: { id: true, name: true, x: true, y: true, direction: true },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  },
+} satisfies Prisma.WarehouseInclude;
 
 @Injectable()
 export class WarehousesService {
@@ -63,9 +77,9 @@ export class WarehousesService {
       width: warehouse.width,
       height: warehouse.height,
       ownerId: warehouse.ownerId,
-      robots: [],
-      obstacles: [],
-      stations: [],
+      robots: warehouse.robots,
+      obstacles: warehouse.obstacles,
+      stations: warehouse.stations,
       createdAt: warehouse.createdAt.toISOString(),
       updatedAt: warehouse.updatedAt.toISOString(),
     };
@@ -112,10 +126,18 @@ export class WarehousesService {
     throw error;
   }
 
-  private async findOwned(ownerId: string, id: string): Promise<Warehouse> {
-    const warehouse = await this.prisma.warehouse.findFirst({
-      where: { id, ownerId },
-    });
+  private async findOwned(ownerId: string, id: string) {
+    // Prisma loads each relation with its own query; a single snapshot keeps
+    // a concurrent map edit from being returned half-applied. The transaction
+    // must be interactive: an array of one query ignores the isolation level.
+    const warehouse = await this.prisma.$transaction(
+      (tx) =>
+        tx.warehouse.findFirst({
+          where: { id, ownerId },
+          include: mapObjects,
+        }),
+      { isolationLevel: 'RepeatableRead' },
+    );
 
     if (!warehouse) {
       throw new NotFoundException(NOT_FOUND);
